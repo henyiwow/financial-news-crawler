@@ -43,11 +43,15 @@ class RssCrawler(BaseCrawler):
             except Exception as e:
                 logger.error(f"爬取 RSS 訂閱源 '{feed_url}' 時出錯: {str(e)}")
         
-        # 過濾符合關鍵詞的新聞
+        # 修改：放寬關鍵詞匹配邏輯，使用部分匹配而不是完全匹配
         filtered_news = []
         for item in all_news:
             for term in self.search_terms:
-                if term in item.title or term in item.content:
+                # 檢查標題或內容中是否包含關鍵詞（部分匹配）
+                if (term in item.title or 
+                    (item.content and term in item.content) or 
+                    (item.source and term in item.source)):
+                    
                     item.keyword = term  # 設置關鍵詞
                     filtered_news.append(item)
                     logger.info(f"符合關鍵詞 '{term}' 的新聞: {item.title[:30]}...")
