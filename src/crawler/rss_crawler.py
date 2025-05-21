@@ -74,9 +74,15 @@ class RssCrawler(BaseCrawler):
                     # 獲取發布時間
                     pub_time = datetime.now()
                     if hasattr(entry, 'published_parsed'):
-                        pub_time = datetime(*entry.published_parsed[:6])
+                        try:
+                            pub_time = datetime(*entry.published_parsed[:6])
+                        except:
+                            pass
                     elif hasattr(entry, 'updated_parsed'):
-                        pub_time = datetime(*entry.updated_parsed[:6])
+                        try:
+                            pub_time = datetime(*entry.updated_parsed[:6])
+                        except:
+                            pass
                     
                     # 僅保留24小時內的新聞
                     hours_diff = (datetime.now() - pub_time).total_seconds() / 3600
