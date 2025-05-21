@@ -16,6 +16,7 @@ class GoogleNewsCrawler(BaseCrawler):
         super().__init__(config)
         self.base_url = "https://www.google.com/search"
         self.region = config.get('region', 'tw')  # 預設為台灣地區
+        self.hours_limit = config.get('hours_limit', 24)  # 預設限制24小時
         self.headers = {
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
             "Accept-Language": "zh-TW,zh;q=0.9,en-US;q=0.8,en;q=0.7"
@@ -171,9 +172,12 @@ class GoogleNewsCrawler(BaseCrawler):
                             days = int(''.join(filter(str.isdigit, time_text)))
                             pub_time = datetime.now() - timedelta(days=days)
                     
-                    # 僅保留24小時內的新聞
+                    # 僅保留時間範圍內的新聞
                     hours_diff = (datetime.now() - pub_time).total_seconds() / 3600
-                    if hours_diff > 24:
+                    logger.debug(f"新聞時間: {pub_time}, 距現在: {hours_diff:.1f} 小時")
+                    
+                    if hours_diff > self.hours_limit:
+                        logger.debug(f"跳過，超出時間限制: {self.hours_limit} 小時")
                         continue
                     
                     # 獲取詳細內容
