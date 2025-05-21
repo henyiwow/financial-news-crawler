@@ -11,6 +11,7 @@ from loguru import logger
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from src.crawler.google_news_crawler import GoogleNewsCrawler
+from src.crawler.rss_crawler import RssCrawler  # 添加這行
 from src.summarizer.text_summarizer import TextSummarizer
 from src.notification.line_notifier import LineNotifier
 from src.crawler.utils import load_config, setup_logger
