@@ -10,6 +10,8 @@ on:
 jobs:
   crawl:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write  # 添加寫入內容的權限
     
     steps:
     - name: Check out repository
@@ -61,11 +63,15 @@ jobs:
     - name: Log run time
       run: |
         echo "Crawler completed at $(date '+%Y-%m-%d %H:%M:%S')" >> crawler_log.txt
+    
+    - name: Set up Git credentials
+      run: |
+        git config --global user.email "github-actions@github.com"
+        git config --global user.name "GitHub Actions"
+        git remote set-url origin https://${{ github.actor }}:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}
         
     - name: Commit and push log
       run: |
-        git config --local user.email "action@github.com"
-        git config --local user.name "GitHub Action"
         git add crawler_log.txt
         git commit -m "Add crawler log for $(date '+%Y-%m-%d')" || echo "No changes to commit"
         git push
