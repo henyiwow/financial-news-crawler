@@ -1,0 +1,42 @@
+# 配置文件 (避免將敏感信息上傳到GitHub)
+.env
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# 虛擬環境
+venv/
+ENV/
+env/
+
+# IDE相關
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# 測試與日誌
+.coverage
+htmlcov/
+.pytest_cache/
+logs/
+*.log
