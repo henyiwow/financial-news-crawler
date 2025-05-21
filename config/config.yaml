@@ -2,6 +2,7 @@
 crawler:
   sources:
     - google_news
+    - rss
   search_terms:
     - 新光人壽
     - 新光金控
@@ -14,6 +15,13 @@ crawler:
   max_news_per_term: 3
   time_period: "1d"  # 爬取過去一天的新聞
   region: "tw"     # 限制為台灣地區的新聞
+  rss_feeds:
+    - https://ec.ltn.com.tw/rss/finance.xml
+    - https://www.chinatimes.com/rss/finance.xml
+    - https://news.cnyes.com/rss/news/cat/tw_stock
+    - https://news.cnyes.com/rss/news/cat/tw_macro
+    - https://udn.com/rssfeed/news/2/6638?ch=news
+    - https://www.wealth.com.tw/rss/category/4
 
 # 摘要設定
 summarizer:
