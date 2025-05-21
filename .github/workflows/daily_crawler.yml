@@ -1,0 +1,68 @@
+name: Daily Financial News Crawler
+
+on:
+  schedule:
+    # 每天早上 8:00 (UTC+8) 執行，對應UTC時間 00:00
+    - cron: '0 0 * * *'
+  workflow_dispatch:
+    # 允許手動觸發工作流程
+
+jobs:
+  crawl:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Check out repository
+      uses: actions/checkout@v2
+    
+    - name: Set up Python
+      uses: actions/setup-python@v2
+      with:
+        python-version: '3.9'
+    
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+    
+    - name: Set environment variables
+      run: |
+        echo "LINE_CHANNEL_ACCESS_TOKEN=${{ secrets.LINE_CHANNEL_ACCESS_TOKEN }}" >> $GITHUB_ENV
+        echo "LINE_CHANNEL_SECRET=${{ secrets.LINE_CHANNEL_SECRET }}" >> $GITHUB_ENV
+        echo "LINE_USER_ID=${{ secrets.LINE_USER_ID }}" >> $GITHUB_ENV
+    
+    - name: Update config with secrets
+      run: |
+        python -c "
+        import yaml;
+        import os;
+        
+        # 讀取配置文件
+        with open('config/config.yaml', 'r', encoding='utf-8') as file:
+            config = yaml.safe_load(file);
+        
+        # 更新Line配置
+        config['line_notify']['channel_access_token'] = os.environ.get('LINE_CHANNEL_ACCESS_TOKEN');
+        config['line_notify']['channel_secret'] = os.environ.get('LINE_CHANNEL_SECRET');
+        config['line_notify']['user_id'] = os.environ.get('LINE_USER_ID');
+        
+        # 寫回配置文件
+        with open('config/config.yaml', 'w', encoding='utf-8') as file:
+            yaml.dump(config, file, default_flow_style=False, allow_unicode=True);
+        "
+    
+    - name: Run crawler
+      run: |
+        python src/main.py --now
+        
+    - name: Log run time
+      run: |
+        echo "Crawler completed at $(date '+%Y-%m-%d %H:%M:%S')" >> crawler_log.txt
+        
+    - name: Commit and push log
+      run: |
+        git config --local user.email "action@github.com"
+        git config --local user.name "GitHub Action"
+        git add crawler_log.txt
+        git commit -m "Add crawler log for $(date '+%Y-%m-%d')" || echo "No changes to commit"
+        git push
