@@ -123,12 +123,28 @@ class GoogleNewsCrawler(BaseCrawler):
         return news_items
     
     def _get_article_content(self, url: str) -> str:
-        """使用newspaper3k獲取文章內容"""
-        try:
-            article = Article(url)
-            article.download()
-            article.parse()
-            return article.text
-        except Exception as e:
-            logger.warning(f"獲取文章內容時出錯: {str(e)}")
-            return "無法獲取文章內容"
+    """獲取文章內容"""
+    try:
+        # 使用更簡單的方式獲取內容
+        response = requests.get(url, headers=self.headers, timeout=10)
+        response.raise_for_status()
+        
+        # 使用Beautiful Soup解析頁面
+        soup = BeautifulSoup(response.text, 'html.parser')
+        
+        # 移除腳本和樣式標籤
+        for script in soup(["script", "style"]):
+            script.extract()
+        
+        # 獲取所有文本
+        text = soup.get_text()
+        
+        # 清理文本
+        lines = (line.strip() for line in text.splitlines())
+        chunks = (phrase.strip() for line in lines for phrase in line.split("  "))
+        text = '\n'.join(chunk for chunk in chunks if chunk)
+        
+        return text
+    except Exception as e:
+        logger.warning(f"獲取文章內容時出錯: {str(e)}")
+        return "無法獲取文章內容"
