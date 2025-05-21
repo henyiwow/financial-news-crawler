@@ -4,8 +4,6 @@ from datetime import datetime, timedelta
 import time
 import random
 from typing import List, Dict, Any
-import newspaper
-from newspaper import Article
 from urllib.parse import quote
 from loguru import logger
 
@@ -122,7 +120,7 @@ class GoogleNewsCrawler(BaseCrawler):
         
         return news_items
     
-    def _get_article_content(self, url: str) -> str:
+   def _get_article_content(self, url: str) -> str:
     """獲取文章內容"""
     try:
         # 使用更簡單的方式獲取內容
