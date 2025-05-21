@@ -13,6 +13,7 @@ class RssCrawler(BaseCrawler):
     
     def __init__(self, config: Dict[str, Any]):
         super().__init__(config)
+        self.hours_limit = config.get('hours_limit', 24)  # 預設限制24小時
         self.rss_feeds = config.get('rss_feeds', [
             # 預設的金融相關 RSS 訂閱源
             "https://ec.ltn.com.tw/rss/finance.xml",            # 自由時報財經
@@ -49,7 +50,10 @@ class RssCrawler(BaseCrawler):
                 if term in item.title or term in item.content:
                     item.keyword = term  # 設置關鍵詞
                     filtered_news.append(item)
+                    logger.info(f"符合關鍵詞 '{term}' 的新聞: {item.title[:30]}...")
                     break
+        
+        logger.info(f"過濾後剩餘 {len(filtered_news)} 條相關新聞")
         
         # 根據優先順序排序
         sorted_news = self.sort_by_priority(filtered_news)
@@ -84,9 +88,12 @@ class RssCrawler(BaseCrawler):
                         except:
                             pass
                     
-                    # 僅保留24小時內的新聞
+                    # 僅保留時間範圍內的新聞
                     hours_diff = (datetime.now() - pub_time).total_seconds() / 3600
-                    if hours_diff > 24:
+                    logger.debug(f"新聞時間: {pub_time}, 距現在: {hours_diff:.1f} 小時")
+                    
+                    if hours_diff > self.hours_limit:
+                        logger.debug(f"跳過，超出時間限制: {self.hours_limit} 小時")
                         continue
                     
                     # 獲取內容
@@ -118,38 +125,4 @@ class RssCrawler(BaseCrawler):
                     )
                     
                     news_items.append(news_item)
-                    
-                except Exception as e:
-                    logger.warning(f"解析 RSS 條目時出錯: {str(e)}")
-            
-        except Exception as e:
-            logger.error(f"解析 RSS 訂閱源 '{feed_url}' 時出錯: {str(e)}")
-        
-        return news_items
-    
-    def _get_article_content(self, url: str) -> str:
-        """獲取文章內容"""
-        try:
-            # 使用更簡單的方式獲取內容
-            response = requests.get(url, headers=self.headers, timeout=10)
-            response.raise_for_status()
-            
-            # 使用Beautiful Soup解析頁面
-            soup = BeautifulSoup(response.text, 'html.parser')
-            
-            # 移除腳本和樣式標籤
-            for script in soup(["script", "style"]):
-                script.extract()
-            
-            # 獲取所有文本
-            text = soup.get_text()
-            
-            # 清理文本
-            lines = (line.strip() for line in text.splitlines())
-            chunks = (phrase.strip() for line in lines for phrase in line.split("  "))
-            text = '\n'.join(chunk for chunk in chunks if chunk)
-            
-            return text
-        except Exception as e:
-            logger.warning(f"獲取文章內容時出錯: {str(e)}")
-            return "無法獲取文章內容"
+                    logger.debug(f"成功解析RSS條目: {title[:30]}
