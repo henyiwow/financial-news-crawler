@@ -1,1 +1,28 @@
+# 爬蟲設定
+crawler:
+  sources:
+    - google_news
+  search_terms:
+    - 新光人壽
+    - 新光金控
+    - 台新金控
+    - 台新人壽
+    - 金控
+    - 壽險
+    - 健康險
+    - 意外險
+  max_news_per_term: 3
+  time_period: "1d"  # 爬取過去一天的新聞
+  region: "tw"     # 限制為台灣地區的新聞
 
+# 摘要設定
+summarizer:
+  max_length: 100
+  language: "chinese"
+
+# Line通知設定
+line_notify:
+  channel_access_token: "YOUR_LINE_CHANNEL_ACCESS_TOKEN"
+  channel_secret: "YOUR_LINE_CHANNEL_SECRET"
+  user_id: "YOUR_USER_ID_OR_GROUP_ID"
+  max_message_length: 2000  # Line訊息最大長度限制
