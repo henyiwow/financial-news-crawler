@@ -11,7 +11,8 @@ from loguru import logger
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from src.crawler.google_news_crawler import GoogleNewsCrawler
-from src.crawler.rss_crawler import RssCrawler  # 添加這行
+from src.crawler.rss_crawler import RssCrawler
+from src.crawler.finance_direct_crawler import FinanceNewsDirectCrawler
 from src.summarizer.text_summarizer import TextSummarizer
 from src.notification.line_notifier import LineNotifier
 from src.crawler.utils import load_config, setup_logger
@@ -27,6 +28,14 @@ def run_crawler():
         config = load_config(config_path)
         
         all_news = []
+        
+        # 優先使用財經新聞直接爬蟲，因為這更有可能找到相關新聞
+        if 'finance_direct' in config['crawler']['sources']:
+            logger.info("使用財經新聞直接爬蟲獲取新聞")
+            finance_crawler = FinanceNewsDirectCrawler(config['crawler'])
+            finance_news = finance_crawler.crawl()
+            all_news.extend(finance_news)
+            logger.info(f"從財經新聞網站直接爬取到 {len(finance_news)} 條新聞")
         
         # 使用Google新聞爬蟲
         if 'google_news' in config['crawler']['sources']:
@@ -88,6 +97,7 @@ def run_crawler():
     
     end_time = datetime.now()
     logger.info(f"爬蟲任務結束，耗時: {end_time - start_time}")
+
 def main():
     """主函數"""
     # 設置日誌
