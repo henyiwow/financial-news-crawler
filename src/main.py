@@ -26,14 +26,31 @@ def run_crawler():
         config_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'config', 'config.yaml')
         config = load_config(config_path)
         
-        # 初始化爬蟲
-        crawler = GoogleNewsCrawler(config['crawler'])
+        all_news = []
         
-        # 爬取新聞
-        news_items = crawler.crawl()
-        logger.info(f"爬取到 {len(news_items)} 條新聞")
+        # 使用Google新聞爬蟲
+        if 'google_news' in config['crawler']['sources']:
+            logger.info("使用Google新聞爬蟲獲取新聞")
+            google_crawler = GoogleNewsCrawler(config['crawler'])
+            google_news = google_crawler.crawl()
+            all_news.extend(google_news)
+            logger.info(f"從Google新聞爬取到 {len(google_news)} 條新聞")
         
-        if not news_items:
+        # 使用RSS爬蟲
+        if 'rss' in config['crawler']['sources']:
+            logger.info("使用RSS爬蟲獲取新聞")
+            rss_crawler = RssCrawler(config['crawler'])
+            rss_news = rss_crawler.crawl()
+            all_news.extend(rss_news)
+            logger.info(f"從RSS爬取到 {len(rss_news)} 條新聞")
+        
+        # 根據關鍵詞優先排序所有新聞
+        priority_map = {term: i for i, term in enumerate(config['crawler']['search_terms'])}
+        all_news = sorted(all_news, key=lambda item: priority_map.get(item.keyword, float('inf')))
+        
+        logger.info(f"總共爬取到 {len(all_news)} 條新聞")
+        
+        if not all_news:
             logger.info("沒有找到相關新聞，任務結束")
             return
         
@@ -42,7 +59,7 @@ def run_crawler():
         
         # 生成摘要
         news_summaries = []
-        for item in news_items:
+        for item in all_news:
             summary = summarizer.summarize(item.content)
             
             news_summaries.append({
@@ -71,7 +88,6 @@ def run_crawler():
     
     end_time = datetime.now()
     logger.info(f"爬蟲任務結束，耗時: {end_time - start_time}")
-
 def main():
     """主函數"""
     # 設置日誌
