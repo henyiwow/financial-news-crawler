@@ -117,5 +117,113 @@ class GoogleNewsCrawler(BaseCrawler):
                         url = link_element.get("href")
                         # 修正URL，確保是完整URL
                         if url.startswith("/url?"):
-                            parsed = parse_qs(url.split("?")[1])
-                            if "url" in pars
+                            try:
+                                parsed = parse_qs(url.split("?")[1])
+                                if "url" in parsed and parsed["url"]:
+                                    url = parsed["url"][0]
+                            except Exception as e:
+                                logger.warning(f"解析URL時出錯: {str(e)}")
+                    
+                    # 尋找來源
+                    source_elements = [
+                        div.find("div", class_="CEMjEf"),
+                        div.find("div", class_="UPmit"),
+                        div.find("span", class_="xQ82C"),
+                        div.find(["div", "span"], string=lambda s: "·" in s if s else False),
+                    ]
+                    
+                    for element in source_elements:
+                        if element and element.get_text().strip():
+                            source = element.get_text().strip()
+                            # 清理來源文本
+                            if "·" in source:
+                                source = source.split("·")[0].strip()
+                            break
+                    
+                    # 尋找時間
+                    time_elements = [
+                        div.find("div", class_="OSrXXb"),
+                        div.find("span", class_="WG9SHc"),
+                        div.find("time"),
+                        div.find(["span", "div"], string=lambda s: "前" in s if s else False),
+                    ]
+                    
+                    for element in time_elements:
+                        if element and element.get_text().strip():
+                            time_text = element.get_text().strip()
+                            break
+                    
+                    # 確保所有必需元素都存在
+                    if not all([title, url, source]):
+                        continue
+                    
+                    # 解析發布時間
+                    pub_time = datetime.now()
+                    if time_text:
+                        # 嘗試解析多種時間格式
+                        if "小時前" in time_text:
+                            hours = int(''.join(filter(str.isdigit, time_text)))
+                            pub_time = datetime.now() - timedelta(hours=hours)
+                        elif "分鐘前" in time_text:
+                            minutes = int(''.join(filter(str.isdigit, time_text)))
+                            pub_time = datetime.now() - timedelta(minutes=minutes)
+                        elif "天前" in time_text:
+                            days = int(''.join(filter(str.isdigit, time_text)))
+                            pub_time = datetime.now() - timedelta(days=days)
+                    
+                    # 僅保留24小時內的新聞
+                    hours_diff = (datetime.now() - pub_time).total_seconds() / 3600
+                    if hours_diff > 24:
+                        continue
+                    
+                    # 獲取詳細內容
+                    content = self._get_article_content(url)
+                    
+                    # 創建新聞項目
+                    news_item = NewItem(
+                        title=title,
+                        content=content,
+                        url=url,
+                        published_time=pub_time,
+                        source=source,
+                        keyword=term
+                    )
+                    
+                    news_items.append(news_item)
+                    count += 1
+                    logger.info(f"成功解析新聞: {title[:30]}...")
+                    
+                except Exception as e:
+                    logger.warning(f"解析新聞時出錯: {str(e)}")
+            
+        except requests.RequestException as e:
+            logger.error(f"請求Google新聞時出錯: {str(e)}")
+        
+        return news_items
+    
+    def _get_article_content(self, url: str) -> str:
+        """獲取文章內容"""
+        try:
+            # 使用更簡單的方式獲取內容
+            response = requests.get(url, headers=self.headers, timeout=10)
+            response.raise_for_status()
+            
+            # 使用Beautiful Soup解析頁面
+            soup = BeautifulSoup(response.text, 'html.parser')
+            
+            # 移除腳本和樣式標籤
+            for script in soup(["script", "style"]):
+                script.extract()
+            
+            # 獲取所有文本
+            text = soup.get_text()
+            
+            # 清理文本
+            lines = (line.strip() for line in text.splitlines())
+            chunks = (phrase.strip() for line in lines for phrase in line.split("  "))
+            text = '\n'.join(chunk for chunk in chunks if chunk)
+            
+            return text
+        except Exception as e:
+            logger.warning(f"獲取文章內容時出錯: {str(e)}")
+            return "無法獲取文章內容"
