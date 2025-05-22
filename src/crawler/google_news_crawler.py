@@ -1,4 +1,166 @@
-# 尋找來源 - 使用更多選擇器
+import requests
+from bs4 import BeautifulSoup
+from datetime import datetime, timedelta
+import time
+import random
+from typing import List, Dict, Any
+from urllib.parse import quote, parse_qs
+from loguru import logger
+
+from .base_crawler import BaseCrawler, NewItem
+
+class GoogleNewsCrawler(BaseCrawler):
+    """Google新聞爬蟲"""
+    
+    def __init__(self, config: Dict[str, Any]):
+        super().__init__(config)
+        self.base_url = "https://www.google.com/search"
+        self.region = config.get('region', 'tw')
+        self.hours_limit = config.get('hours_limit', 24)
+        self.max_pages = config.get('max_pages', 3)  # 新增：每個關鍵詞搜尋的最大頁數
+        self.headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
+            "Accept-Language": "zh-TW,zh;q=0.9,en-US;q=0.8,en;q=0.7"
+        }
+    
+    def crawl(self) -> List[NewItem]:
+        """爬取Google新聞"""
+        all_news = []
+        
+        for term in self.search_terms:
+            logger.info(f"搜尋關鍵詞: {term}")
+            try:
+                # 多頁搜尋每個關鍵詞
+                news_items = self._search_term_multiple_pages(term)
+                all_news.extend(news_items)
+                
+                # 避免被Google封鎖，增加隨機延遲
+                time.sleep(random.uniform(2, 4))
+            except Exception as e:
+                logger.error(f"爬取關鍵詞 '{term}' 時出錯: {str(e)}")
+        
+        # 去重複
+        unique_news = self._remove_duplicates(all_news)
+        logger.info(f"去重後剩餘 {len(unique_news)} 條新聞")
+        
+        # 根據優先順序排序
+        sorted_news = self.sort_by_priority(unique_news)
+        return sorted_news
+    
+    def _search_term_multiple_pages(self, term: str) -> List[NewItem]:
+        """搜尋多頁結果"""
+        all_news = []
+        
+        for page in range(self.max_pages):
+            logger.info(f"搜尋關鍵詞 '{term}' 第 {page + 1} 頁")
+            
+            try:
+                news_items = self._search_term(term, page)
+                all_news.extend(news_items)
+                
+                # 如果沒有找到新聞，提前結束
+                if not news_items:
+                    logger.info(f"關鍵詞 '{term}' 第 {page + 1} 頁無結果，停止搜尋")
+                    break
+                
+                # 頁面間延遲
+                if page < self.max_pages - 1:
+                    time.sleep(random.uniform(1, 2))
+                    
+            except Exception as e:
+                logger.error(f"搜尋關鍵詞 '{term}' 第 {page + 1} 頁時出錯: {str(e)}")
+                break
+        
+        logger.info(f"關鍵詞 '{term}' 總共找到 {len(all_news)} 條新聞")
+        return all_news
+    
+    def _search_term(self, term: str, page: int = 0) -> List[NewItem]:
+        """使用特定關鍵詞搜尋Google新聞"""
+        news_items = []
+        
+        # 構建查詢參數
+        params = {
+            "q": f"{term}",
+            "tbm": "nws",  # 新聞搜尋
+            "tbs": f"qdr:{self.time_period}",  # 時間範圍
+            "hl": "zh-TW",  # 語言
+            "gl": "tw",     # 地區：台灣
+            "start": page * 10  # 分頁參數
+        }
+        
+        try:
+            response = requests.get(self.base_url, params=params, headers=self.headers, timeout=10)
+            response.raise_for_status()
+            
+            soup = BeautifulSoup(response.text, 'html.parser')
+            
+            # 嘗試多種可能的新聞元素選擇器
+            news_divs = []
+            
+            selector_attempts = [
+                "div.SoaBEf",
+                "div.WlydOe", 
+                "div.xuvV6b",
+                "div.DBQmFf",
+                "g-card.ftSUBd",
+                "div.v7W49e",
+                "div.g",  # 新增更通用的選擇器
+                ".g .rc"  # 新增
+            ]
+            
+            for selector in selector_attempts:
+                elements = soup.select(selector)
+                if elements:
+                    news_divs = elements
+                    logger.info(f"第 {page + 1} 頁找到選擇器 {selector} 的新聞元素: {len(elements)} 個")
+                    break
+            
+            if not news_divs:
+                # 更通用的方法
+                news_divs = soup.find_all("div", recursive=True, limit=30)
+                news_divs = [div for div in news_divs if div.find("a") and div.find("h3")]
+                logger.info(f"第 {page + 1} 頁使用通用方法找到 {len(news_divs)} 個可能的新聞元素")
+            
+            count = 0
+            for div in news_divs:
+                if count >= self.max_news_per_term * 2:  # 增加每頁處理的新聞數量
+                    break
+                
+                try:
+                    # 解析新聞元素
+                    title = None
+                    url = None
+                    source = None
+                    time_text = None
+                    
+                    # 尋找標題 - 使用更多選擇器
+                    title_elements = [
+                        div.find("div", class_="mCBkyc"),
+                        div.find("h3"),
+                        div.find("a", class_="DY5T1d"),
+                        div.find(["h3", "h4", "h2"]),
+                        div.find("div", class_="BNeawe"),  # 新增
+                        div.find("div", class_="r")       # 新增
+                    ]
+                    
+                    for element in title_elements:
+                        if element and element.get_text().strip():
+                            title = element.get_text().strip()
+                            break
+                    
+                    # 尋找連結
+                    link_element = div.find("a")
+                    if link_element and link_element.get("href"):
+                        url = link_element.get("href")
+                        if url.startswith("/url?"):
+                            try:
+                                parsed = parse_qs(url.split("?")[1])
+                                if "url" in parsed and parsed["url"]:
+                                    url = parsed["url"][0]
+                            except Exception as e:
+                                logger.warning(f"解析URL時出錯: {str(e)}")
+                    
+                    # 尋找來源 - 使用更多選擇器
                     source_elements = [
                         div.find("div", class_="CEMjEf"),
                         div.find("div", class_="UPmit"),
