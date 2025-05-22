@@ -49,8 +49,9 @@ crawler:
     - 配息
     - 財報
   max_news_per_term: 5
+  max_pages: 3        # 新增：Google搜尋每個關鍵詞的最大頁數
   time_period: "7d"
-  hours_limit: 168  # 一周內的新聞
+  hours_limit: 168    # 一周內的新聞
   region: "tw"
   rss_feeds:
     - https://ec.ltn.com.tw/rss/finance.xml
@@ -69,5 +70,5 @@ summarizer:
 line_notify:
   channel_access_token: "YOUR_LINE_CHANNEL_ACCESS_TOKEN"
   channel_secret: "YOUR_LINE_CHANNEL_SECRET"
-  user_id: "YOUR_USER_ID_OR_GROUP_ID"
+  user_id: "broadcast"
   max_message_length: 2000
