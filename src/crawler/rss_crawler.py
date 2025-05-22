@@ -28,12 +28,22 @@ class RssCrawler(BaseCrawler):
             "Accept-Language": "zh-TW,zh;q=0.9,en-US;q=0.8,en;q=0.7"
         }
         
+        # 專門針對保險的關鍵詞（優先匹配）
+        self.insurance_keywords = [
+            "新光人壽", "新光金控", "台新金控", "台新人壽",
+            "保險", "壽險", "健康險", "意外險", "醫療險", "癌症險", "重大疾病險",
+            "儲蓄險", "投資型保險", "年金險", "退休金", "保障", "保費", "保單",
+            "理賠", "給付", "受益人", "要保人", "被保險人", "保險金額", "保險期間",
+            "保險業", "保險公司", "保險法", "保險監理", "保險密度", "保險滲透率",
+            "核保", "承保", "風險評估", "精算", "再保險", "保險經紀", "保險代理",
+            "團體保險", "個人保險", "企業保險", "產險", "人身保險", "財產保險"
+        ]
+        
         # 定義廣泛的財經關鍵詞，只要包含任何一個就算符合
         self.broad_keywords = [
-            "保險", "壽險", "健康險", "意外險", "理賠", "保單", "保費", "保障",
             "金控", "金融", "銀行", "理財", "投資", "股市", "股票", "基金", 
             "證券", "央行", "利率", "定存", "財富", "經濟", "財經", "金融業",
-            "新光", "台新", "富邦", "國泰", "中信", "第一金", "玉山", "永豐",
+            "富邦", "國泰", "中信", "第一金", "玉山", "永豐",
             "上市", "上櫃", "市值", "營收", "獲利", "股價", "配息", "股利",
             "ETF", "債券", "匯率", "通膨", "升息", "降息", "QE", "貨幣",
             "財報", "季報", "年報", "法說", "股東會", "除權", "除息",
@@ -55,20 +65,27 @@ class RssCrawler(BaseCrawler):
             except Exception as e:
                 logger.error(f"爬取 RSS 訂閱源 '{feed_url}' 時出錯: {str(e)}")
         
-        # 大幅放寬關鍵詞匹配邏輯 - 只要包含任何財經相關關鍵詞就算符合
+        # 優先匹配保險關鍵詞
         filtered_news = []
         for item in all_news:
-            # 檢查標題和內容是否包含任何廣泛的財經關鍵詞
             title_content = (item.title + " " + (item.content or "")).lower()
             
-            # 首先檢查原始關鍵詞列表
             matched_keyword = None
-            for term in self.search_terms:
-                if term in item.title or (item.content and term in item.content):
-                    matched_keyword = term
+            
+            # 首先檢查保險專業關鍵詞（最高優先級）
+            for insurance_term in self.insurance_keywords:
+                if insurance_term in item.title or (item.content and insurance_term in item.content):
+                    matched_keyword = insurance_term
                     break
             
-            # 如果原始關鍵詞沒有匹配，檢查廣泛的財經關鍵詞
+            # 如果沒有匹配保險關鍵詞，檢查原始關鍵詞列表
+            if not matched_keyword:
+                for term in self.search_terms:
+                    if term in item.title or (item.content and term in item.content):
+                        matched_keyword = term
+                        break
+            
+            # 最後檢查廣泛的財經關鍵詞
             if not matched_keyword:
                 for broad_term in self.broad_keywords:
                     if broad_term in title_content:
