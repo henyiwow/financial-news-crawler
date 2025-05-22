@@ -27,6 +27,18 @@ class RssCrawler(BaseCrawler):
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
             "Accept-Language": "zh-TW,zh;q=0.9,en-US;q=0.8,en;q=0.7"
         }
+        
+        # 定義廣泛的財經關鍵詞，只要包含任何一個就算符合
+        self.broad_keywords = [
+            "保險", "壽險", "健康險", "意外險", "理賠", "保單", "保費", "保障",
+            "金控", "金融", "銀行", "理財", "投資", "股市", "股票", "基金", 
+            "證券", "央行", "利率", "定存", "財富", "經濟", "財經", "金融業",
+            "新光", "台新", "富邦", "國泰", "中信", "第一金", "玉山", "永豐",
+            "上市", "上櫃", "市值", "營收", "獲利", "股價", "配息", "股利",
+            "ETF", "債券", "匯率", "通膨", "升息", "降息", "QE", "貨幣",
+            "財報", "季報", "年報", "法說", "股東會", "除權", "除息",
+            "IPO", "增資", "減資", "併購", "重組"
+        ]
     
     def crawl(self) -> List[NewItem]:
         """爬取 RSS 訂閱源的新聞"""
@@ -43,19 +55,30 @@ class RssCrawler(BaseCrawler):
             except Exception as e:
                 logger.error(f"爬取 RSS 訂閱源 '{feed_url}' 時出錯: {str(e)}")
         
-        # 修改：放寬關鍵詞匹配邏輯，使用部分匹配而不是完全匹配
+        # 大幅放寬關鍵詞匹配邏輯 - 只要包含任何財經相關關鍵詞就算符合
         filtered_news = []
         for item in all_news:
+            # 檢查標題和內容是否包含任何廣泛的財經關鍵詞
+            title_content = (item.title + " " + (item.content or "")).lower()
+            
+            # 首先檢查原始關鍵詞列表
+            matched_keyword = None
             for term in self.search_terms:
-                # 檢查標題或內容中是否包含關鍵詞（部分匹配）
-                if (term in item.title or 
-                    (item.content and term in item.content) or 
-                    (item.source and term in item.source)):
-                    
-                    item.keyword = term  # 設置關鍵詞
-                    filtered_news.append(item)
-                    logger.info(f"符合關鍵詞 '{term}' 的新聞: {item.title[:30]}...")
+                if term in item.title or (item.content and term in item.content):
+                    matched_keyword = term
                     break
+            
+            # 如果原始關鍵詞沒有匹配，檢查廣泛的財經關鍵詞
+            if not matched_keyword:
+                for broad_term in self.broad_keywords:
+                    if broad_term in title_content:
+                        matched_keyword = broad_term
+                        break
+            
+            if matched_keyword:
+                item.keyword = matched_keyword  # 設置關鍵詞
+                filtered_news.append(item)
+                logger.info(f"符合關鍵詞 '{matched_keyword}' 的新聞: {item.title[:30]}...")
         
         logger.info(f"過濾後剩餘 {len(filtered_news)} 條相關新聞")
         
