@@ -1,57 +1,47 @@
 # 爬蟲設定
 crawler:
   sources:
-    - finance_direct
+    - finance_direct  # 優先使用保險專業網站
     - google_news
     - rss
   search_terms:
-    # 公司相關 - 主要目標
+    # 保險公司 - 最高優先級
     - 新光人壽
     - 新光金控
     - 台新金控
     - 台新人壽
-    - 金控
-    - 新光
-    - 台新
-    # 保險相關 - 次要目標
+    # 保險類型 - 高優先級
     - 壽險
     - 健康險
     - 意外險
     - 保險
     - 醫療險
+    - 癌症險
+    - 重大疾病險
+    - 儲蓄險
+    - 投資型保險
+    - 年金險
+    # 保險專業術語 - 中優先級
     - 理賠
     - 保單
     - 保費
     - 保障
-    # 金融相關 - 廣泛目標
+    - 給付
+    - 承保
+    - 核保
+    - 受益人
+    - 要保人
+    - 被保險人
+    # 金融相關 - 低優先級
+    - 金控
     - 理財
     - 投資
-    - 股市
-    - 央行
-    - 利率
     - 基金
-    - 定存
-    - 證券
-    - 財富
-    - 金融
-    - 銀行
-    - 股票
-    - ETF
-    - 債券
-    - 匯率
     - 財經
-    - 經濟
-    - 上市
-    - 上櫃
-    - 營收
-    - 獲利
-    - 股價
-    - 配息
-    - 財報
   max_news_per_term: 5
-  max_pages: 3        # 新增：Google搜尋每個關鍵詞的最大頁數
+  max_pages: 3
   time_period: "7d"
-  hours_limit: 168    # 一周內的新聞
+  hours_limit: 168  # 一周內的新聞
   region: "tw"
   rss_feeds:
     - https://ec.ltn.com.tw/rss/finance.xml
