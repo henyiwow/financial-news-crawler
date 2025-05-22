@@ -11,10 +11,10 @@ class LineNotifier:
         self.channel_access_token = config.get('channel_access_token')
         self.max_message_length = config.get('max_message_length', 2000)
         
-        if not self.channel_access_token:
+        if not self.channel_access_token or self.channel_access_token == "YOUR_LINE_CHANNEL_ACCESS_TOKEN":
             logger.warning("未設置Line Channel Access Token")
         
-        self.line_bot_api = LineBotApi(self.channel_access_token) if self.channel_access_token else None
+        self.line_bot_api = LineBotApi(self.channel_access_token) if self.channel_access_token and self.channel_access_token != "YOUR_LINE_CHANNEL_ACCESS_TOKEN" else None
     
     def send_news_summary(self, news_items: List[Dict[str, Any]]) -> bool:
         """使用廣播發送新聞摘要到所有好友"""
@@ -47,21 +47,34 @@ class LineNotifier:
     
     def _build_message(self, news_items: List[Dict[str, Any]]) -> str:
         """構建Line消息內容"""
-        message_parts = ["📰 今日金融保險新聞摘要\n"]
+        message_parts = [f"📰 今日金融保險新聞摘要 ({len(news_items)}則)\n\n"]
         
-        for item in news_items:
-            # 添加新聞項目，格式：標題 + 摘要 + 來源
+        for i, item in enumerate(news_items, 1):
+            # 清理標題，移除亂碼
+            title = item['title']
+            if title:
+                title = ''.join(char for char in title if ord(char) < 65536)
+                title = title.replace('\n', ' ').replace('\r', ' ').strip()
+            
+            # 添加新聞項目，格式：編號 + 關鍵詞 + 標題 + 摘要 + 來源
             news_part = (
-                f"【{item['keyword']}】{item['title']}\n"
-                f"{item['summary']}\n"
-                f"來源: {item['source']} | {item['url'][:50]}...\n\n"
+                f"{i}. 【{item['keyword']}】\n"
+                f"{title}\n"
+                f"💬 {item['summary']}\n"
+                f"📰 {item['source']}\n"
+                f"🔗 {item['url'][:60]}{'...' if len(item['url']) > 60 else ''}\n\n"
             )
             
             # 檢查是否會超過Line的最大長度限制
             if len(''.join(message_parts) + news_part) > self.max_message_length:
-                message_parts.append("更多新聞因長度限制未顯示...")
+                message_parts.append(f"⚠️ 還有 {len(news_items) - i + 1} 則新聞因長度限制未顯示...")
                 break
             
             message_parts.append(news_part)
+        
+        # 添加時間戳
+        from datetime import datetime
+        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M")
+        message_parts.append(f"\n⏰ 更新時間：{timestamp}")
         
         return ''.join(message_parts)
