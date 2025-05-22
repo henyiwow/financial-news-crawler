@@ -1,21 +1,56 @@
 # 爬蟲設定
 crawler:
   sources:
+    - finance_direct
     - google_news
     - rss
-    - finance_direct
   search_terms:
+    # 公司相關 - 主要目標
     - 新光人壽
     - 新光金控
     - 台新金控
     - 台新人壽
     - 金控
+    - 新光
+    - 台新
+    # 保險相關 - 次要目標
     - 壽險
     - 健康險
     - 意外險
-  max_news_per_term: 3
+    - 保險
+    - 醫療險
+    - 理賠
+    - 保單
+    - 保費
+    - 保障
+    # 金融相關 - 廣泛目標
+    - 理財
+    - 投資
+    - 股市
+    - 央行
+    - 利率
+    - 基金
+    - 定存
+    - 證券
+    - 財富
+    - 金融
+    - 銀行
+    - 股票
+    - ETF
+    - 債券
+    - 匯率
+    - 財經
+    - 經濟
+    - 上市
+    - 上櫃
+    - 營收
+    - 獲利
+    - 股價
+    - 配息
+    - 財報
+  max_news_per_term: 5
   time_period: "7d"
-  hours_limit: 72
+  hours_limit: 168  # 一周內的新聞
   region: "tw"
   rss_feeds:
     - https://ec.ltn.com.tw/rss/finance.xml
