@@ -10,32 +10,68 @@ from loguru import logger
 from .base_crawler import BaseCrawler, NewItem
 
 class GoogleNewsCrawler(BaseCrawler):
-    """Google新聞爬蟲"""
+    """優化後的Google新聞爬蟲 - 專注保險新聞"""
     
     def __init__(self, config: Dict[str, Any]):
         super().__init__(config)
         self.base_url = "https://www.google.com/search"
         self.region = config.get('region', 'tw')
-        self.hours_limit = config.get('hours_limit', 24)
-        self.max_pages = config.get('max_pages', 3)  # 新增：每個關鍵詞搜尋的最大頁數
+        self.hours_limit = config.get('hours_limit', 48)  # 增加到48小時
+        self.max_pages = config.get('max_pages', 3)
         self.headers = {
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
             "Accept-Language": "zh-TW,zh;q=0.9,en-US;q=0.8,en;q=0.7"
         }
+        
+        # 專門針對保險的搜尋關鍵詞
+        self.insurance_search_terms = [
+            # 公司名稱相關
+            "新光人壽 OR 新光金控",
+            "台新人壽 OR 台新金控", 
+            
+            # 險種相關
+            "健康險 OR 醫療險",
+            "投資型保險 OR 變額保險",
+            "壽險 OR 終身壽險",
+            "利變壽險 OR 利率變動型",
+            "意外險 OR 傷害險",
+            "年金險 OR 退休年金",
+            "儲蓄險 OR 還本險",
+            
+            # 保險業務
+            "保險理賠",
+            "保單給付",
+            "保險新商品",
+            "保險法規",
+            
+            # 組合搜尋
+            "保險 健康險",
+            "保險 投資型",
+            "壽險 新光",
+            "壽險 台新"
+        ]
+        
+        # 優先關鍵詞 - 用於結果排序
+        self.priority_keywords = [
+            "新光人壽", "新光金控", "台新人壽", "台新金控",
+            "健康險", "投資型保險", "利變壽險", "意外險"
+        ]
     
     def crawl(self) -> List[NewItem]:
         """爬取Google新聞"""
         all_news = []
         
-        for term in self.search_terms:
+        # 使用專門的保險搜尋關鍵詞
+        search_terms = self.insurance_search_terms + self.search_terms
+        
+        for term in search_terms:
             logger.info(f"搜尋關鍵詞: {term}")
             try:
-                # 多頁搜尋每個關鍵詞
                 news_items = self._search_term_multiple_pages(term)
                 all_news.extend(news_items)
                 
                 # 避免被Google封鎖，增加隨機延遲
-                time.sleep(random.uniform(2, 4))
+                time.sleep(random.uniform(3, 6))
             except Exception as e:
                 logger.error(f"爬取關鍵詞 '{term}' 時出錯: {str(e)}")
         
@@ -43,9 +79,68 @@ class GoogleNewsCrawler(BaseCrawler):
         unique_news = self._remove_duplicates(all_news)
         logger.info(f"去重後剩餘 {len(unique_news)} 條新聞")
         
+        # 過濾保險相關新聞
+        filtered_news = self._filter_insurance_news(unique_news)
+        logger.info(f"過濾後剩餘 {len(filtered_news)} 條保險相關新聞")
+        
         # 根據優先順序排序
-        sorted_news = self.sort_by_priority(unique_news)
-        return sorted_news
+        sorted_news = self.sort_by_priority(filtered_news)
+        return sorted_news[:15]  # 返回前15條
+    
+    def _filter_insurance_news(self, news_list: List[NewItem]) -> List[NewItem]:
+        """過濾出保險相關新聞"""
+        filtered_news = []
+        
+        # 保險相關關鍵詞
+        insurance_keywords = [
+            "新光人壽", "新光金控", "台新人壽", "台新金控",
+            "保險", "壽險", "健康險", "醫療險", "意外險", "傷害險",
+            "投資型保險", "變額保險", "利變壽險", "年金險", "儲蓄險",
+            "理賠", "給付", "保單", "保費", "承保", "核保",
+            "重大疾病險", "癌症險", "實支實付"
+        ]
+        
+        # 排除關鍵詞
+        exclude_keywords = [
+            "股價", "配息", "除權", "除息", "ETF", "基金", "債券",
+            "銀行存款", "信用卡", "房貸", "車貸"
+        ]
+        
+        for item in news_list:
+            title_content = (item.title + " " + (item.content or "")).lower()
+            
+            # 檢查是否包含排除關鍵詞
+            contains_exclude = any(exclude_word in title_content for exclude_word in exclude_keywords)
+            if contains_exclude:
+                continue
+            
+            # 檢查是否包含保險關鍵詞
+            contains_insurance = any(keyword in title_content for keyword in insurance_keywords)
+            
+            if contains_insurance:
+                # 計算優先級分數
+                priority_score = 0
+                matched_keyword = ""
+                
+                for keyword in self.priority_keywords:
+                    if keyword in title_content:
+                        priority_score += 10
+                        matched_keyword = keyword
+                        break
+                
+                for keyword in insurance_keywords:
+                    if keyword in title_content:
+                        if priority_score == 0:
+                            priority_score = 5
+                            matched_keyword = keyword
+                        break
+                
+                item.keyword = matched_keyword
+                item.priority_score = priority_score
+                filtered_news.append(item)
+                logger.info(f"保險相關新聞: {item.title[:30]}...")
+        
+        return filtered_news
     
     def _search_term_multiple_pages(self, term: str) -> List[NewItem]:
         """搜尋多頁結果"""
@@ -65,7 +160,7 @@ class GoogleNewsCrawler(BaseCrawler):
                 
                 # 頁面間延遲
                 if page < self.max_pages - 1:
-                    time.sleep(random.uniform(1, 2))
+                    time.sleep(random.uniform(2, 4))
                     
             except Exception as e:
                 logger.error(f"搜尋關鍵詞 '{term}' 第 {page + 1} 頁時出錯: {str(e)}")
@@ -78,18 +173,19 @@ class GoogleNewsCrawler(BaseCrawler):
         """使用特定關鍵詞搜尋Google新聞"""
         news_items = []
         
-        # 構建查詢參數
+        # 構建更精確的查詢參數
         params = {
-            "q": f"{term}",
+            "q": f"{term} site:tw",  # 限制台灣網站
             "tbm": "nws",  # 新聞搜尋
-            "tbs": f"qdr:{self.time_period}",  # 時間範圍
+            "tbs": "qdr:w2",  # 最近2週
             "hl": "zh-TW",  # 語言
             "gl": "tw",     # 地區：台灣
-            "start": page * 10  # 分頁參數
+            "start": page * 10,  # 分頁參數
+            "num": 20  # 每頁結果數
         }
         
         try:
-            response = requests.get(self.base_url, params=params, headers=self.headers, timeout=10)
+            response = requests.get(self.base_url, params=params, headers=self.headers, timeout=15)
             response.raise_for_status()
             
             soup = BeautifulSoup(response.text, 'html.parser')
@@ -104,8 +200,9 @@ class GoogleNewsCrawler(BaseCrawler):
                 "div.DBQmFf",
                 "g-card.ftSUBd",
                 "div.v7W49e",
-                "div.g",  # 新增更通用的選擇器
-                ".g .rc"  # 新增
+                "div.g",
+                ".g .rc",
+                "[jscontroller='SC7lYd']"
             ]
             
             for selector in selector_attempts:
@@ -117,13 +214,13 @@ class GoogleNewsCrawler(BaseCrawler):
             
             if not news_divs:
                 # 更通用的方法
-                news_divs = soup.find_all("div", recursive=True, limit=30)
+                news_divs = soup.find_all("div", recursive=True, limit=50)
                 news_divs = [div for div in news_divs if div.find("a") and div.find("h3")]
                 logger.info(f"第 {page + 1} 頁使用通用方法找到 {len(news_divs)} 個可能的新聞元素")
             
             count = 0
             for div in news_divs:
-                if count >= self.max_news_per_term * 2:  # 增加每頁處理的新聞數量
+                if count >= 20:  # 每頁處理20條新聞
                     break
                 
                 try:
@@ -133,14 +230,14 @@ class GoogleNewsCrawler(BaseCrawler):
                     source = None
                     time_text = None
                     
-                    # 尋找標題 - 使用更多選擇器
+                    # 尋找標題
                     title_elements = [
                         div.find("div", class_="mCBkyc"),
                         div.find("h3"),
                         div.find("a", class_="DY5T1d"),
                         div.find(["h3", "h4", "h2"]),
-                        div.find("div", class_="BNeawe"),  # 新增
-                        div.find("div", class_="r")       # 新增
+                        div.find("div", class_="BNeawe"),
+                        div.find("div", class_="r")
                     ]
                     
                     for element in title_elements:
@@ -160,13 +257,13 @@ class GoogleNewsCrawler(BaseCrawler):
                             except Exception as e:
                                 logger.warning(f"解析URL時出錯: {str(e)}")
                     
-                    # 尋找來源 - 使用更多選擇器
+                    # 尋找來源
                     source_elements = [
                         div.find("div", class_="CEMjEf"),
                         div.find("div", class_="UPmit"),
                         div.find("span", class_="xQ82C"),
-                        div.find("div", class_="BNeawe"),  # 新增
-                        div.find("cite"),                  # 新增
+                        div.find("div", class_="BNeawe"),
+                        div.find("cite"),
                         div.find(["div", "span"], string=lambda s: "·" in s if s else False),
                     ]
                     
@@ -181,13 +278,13 @@ class GoogleNewsCrawler(BaseCrawler):
                                 source = source.split("http")[0].strip()
                             break
                     
-                    # 尋找時間 - 使用更多選擇器
+                    # 尋找時間
                     time_elements = [
                         div.find("div", class_="OSrXXb"),
                         div.find("span", class_="WG9SHc"),
                         div.find("time"),
-                        div.find("span", class_="f"),      # 新增
-                        div.find("div", class_="slp"),     # 新增
+                        div.find("span", class_="f"),
+                        div.find("div", class_="slp"),
                         div.find(["span", "div"], string=lambda s: "前" in s if s else False),
                     ]
                     
@@ -200,6 +297,16 @@ class GoogleNewsCrawler(BaseCrawler):
                     if not title or not url:
                         continue
                     
+                    # 預篩選：只處理包含保險關鍵詞的新聞
+                    title_lower = title.lower()
+                    insurance_terms = [
+                        "保險", "壽險", "新光", "台新", "理賠", "保單", 
+                        "健康險", "意外險", "醫療險", "投資型", "年金"
+                    ]
+                    
+                    if not any(term in title_lower for term in insurance_terms):
+                        continue
+                    
                     # 設置默認來源
                     if not source:
                         source = "Google新聞"
@@ -207,7 +314,6 @@ class GoogleNewsCrawler(BaseCrawler):
                     # 解析發布時間
                     pub_time = datetime.now()
                     if time_text:
-                        # 嘗試解析多種時間格式
                         try:
                             if "小時前" in time_text:
                                 hours = int(''.join(filter(str.isdigit, time_text)))
@@ -287,9 +393,9 @@ class GoogleNewsCrawler(BaseCrawler):
         """獲取文章內容"""
         try:
             # 設置隨機等待，避免被網站封鎖
-            time.sleep(random.uniform(0.3, 0.8))
+            time.sleep(random.uniform(0.5, 1.2))
             
-            response = requests.get(url, headers=self.headers, timeout=10)
+            response = requests.get(url, headers=self.headers, timeout=15)
             response.raise_for_status()
             
             # 自動檢測編碼
@@ -312,7 +418,8 @@ class GoogleNewsCrawler(BaseCrawler):
                 "article",
                 "main",
                 ".post-content",
-                ".entry-content"
+                ".entry-content",
+                ".news-detail"
             ]
             
             content_text = ""
