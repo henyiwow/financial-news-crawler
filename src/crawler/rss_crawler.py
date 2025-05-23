@@ -13,9 +13,9 @@ class RssCrawler(BaseCrawler):
     
     def __init__(self, config: Dict[str, Any]):
         super().__init__(config)
-        self.hours_limit = config.get('hours_limit', 48)  # 增加到48小時
+        self.hours_limit = config.get('hours_limit', 24)
         
-        # 擴充RSS訂閱源，增加保險專業媒體
+        # RSS訂閱源
         self.rss_feeds = config.get('rss_feeds', [
             # 主流財經媒體
             "https://ec.ltn.com.tw/rss/finance.xml",            # 自由時報財經
@@ -26,12 +26,6 @@ class RssCrawler(BaseCrawler):
             "https://money.udn.com/rssfeed/news/1001/5590/12017?ch=money",  # 經濟日報財經
             "https://ctee.com.tw/feed",                         # 工商時報
             "https://www.wealth.com.tw/rss/category/4",         # 財訊快報
-            
-            # 保險專業媒體（如果有RSS的話）
-            "https://www.rmim.com.tw/rss/news",                 # 保險雜誌（假設RSS）
-            
-            # 金融監管機構
-            "https://www.fsc.gov.tw/rss/news.xml",              # 金管會（假設RSS）
         ])
         
         self.headers = {
@@ -39,43 +33,28 @@ class RssCrawler(BaseCrawler):
             "Accept-Language": "zh-TW,zh;q=0.9,en-US;q=0.8,en;q=0.7"
         }
         
-        # 重新整理關鍵詞，更專注保險
-        self.primary_insurance_keywords = [
-            # 指定公司（最高優先級）
-            "新光人壽", "新光金控", "新光金", "新光保險", 
-            "台新人壽", "台新金控", "台新金", "台新保險",
+        # 保險關鍵詞（按優先級排序）
+        self.primary_keywords = [
+            # 公司名稱（最高優先級）
+            "新光人壽", "新光金控", "新光金", "台新人壽", "台新金控", "台新金",
             
-            # 核心險種（高優先級）
+            # 具體險種（高優先級）
             "健康險", "醫療險", "癌症險", "重大疾病險", "實支實付",
-            "投資型保險", "投資型", "變額保險", "變額萬能",
-            "壽險", "終身壽險", "定期壽險", "終身險",
-            "利變壽險", "利率變動型", "利變險", "增額終身",
-            "意外險", "傷害險", "意外醫療", "意外死殘",
-            "年金險", "即期年金", "遞延年金", "退休年金",
-            "儲蓄險", "還本險", "生存險",
-            
-            # 保險業務關鍵詞
-            "理賠", "給付", "保險金", "死亡給付", "生存給付",
-            "保費", "保單", "投保", "承保", "核保",
-            "要保人", "被保險人", "受益人",
-            "保險期間", "保險金額", "保障額度"
+            "投資型保險", "投資型", "變額保險", "利變壽險", "利率變動型",
+            "意外險", "傷害險", "年金險", "儲蓄險", "終身壽險"
         ]
         
-        # 次要保險關鍵詞
         self.secondary_keywords = [
-            "保險業", "保險公司", "人壽保險", "產險", "壽險業",
-            "保險法", "保險業法", "保險監理", "保險局",
-            "再保險", "保險經紀", "保險代理", "保險通路",
-            "團體保險", "個人保險", "企業保險",
-            "保險科技", "數位保險", "線上投保",
-            "風險評估", "精算", "保險精算", "RBC", "清償能力"
+            # 保險業務詞彙
+            "保險", "壽險", "理賠", "給付", "保單", "保費", "承保", "核保",
+            "要保人", "被保險人", "受益人", "保險金額", "保障額度",
+            "保險業", "保險公司", "保險法", "保險監理"
         ]
         
         # 排除關鍵詞
         self.exclude_keywords = [
             "股價", "股票", "配息", "除權", "除息", "股東會",
-            "ETF", "基金", "債券", "匯率", "央行", "升息", "降息",
-            "銀行存款", "放款", "信用卡", "房貸", "車貸", "消費金融"
+            "ETF", "基金", "債券", "匯率", "央行", "升息", "降息"
         ]
     
     def crawl(self) -> List[NewItem]:
@@ -83,46 +62,48 @@ class RssCrawler(BaseCrawler):
         all_news = []
         
         for feed_url in self.rss_feeds:
-            logger.info(f"爬取RSS訂閱源: {feed_url}")
+            logger.info(f"📡 正在爬取RSS: {feed_url}")
             try:
                 news_items = self._parse_feed(feed_url)
                 all_news.extend(news_items)
                 
-                # 避免過度請求，增加延遲
+                # 避免過度請求
                 time.sleep(2)
             except Exception as e:
-                logger.error(f"爬取RSS訂閱源 '{feed_url}' 時出錯: {str(e)}")
+                logger.error(f"❌ 爬取RSS '{feed_url}' 時出錯: {str(e)}")
         
-        # 改進的篩選邏輯
+        # 進階篩選邏輯
         filtered_news = []
+        logger.info(f"🔍 開始篩選 {len(all_news)} 條新聞...")
+        
         for item in all_news:
             title_content = (item.title + " " + (item.content or "")).lower()
             
-            # 檢查是否包含排除關鍵詞
+            # 檢查排除關鍵詞
             contains_exclude = any(exclude_word in title_content for exclude_word in self.exclude_keywords)
             if contains_exclude:
-                logger.debug(f"排除新聞（包含排除關鍵詞）: {item.title[:30]}...")
+                logger.debug(f"❌ 排除新聞（包含排除關鍵詞）: {item.title[:30]}...")
                 continue
             
             matched_keyword = None
             priority_score = 0
             
-            # 首先檢查主要保險關鍵詞（最高優先級）
-            for insurance_term in self.primary_insurance_keywords:
-                if insurance_term in item.title or (item.content and insurance_term in item.content):
-                    matched_keyword = insurance_term
+            # 檢查主要關鍵詞（最高優先級）
+            for keyword in self.primary_keywords:
+                if keyword in item.title or (item.content and keyword in item.content):
+                    matched_keyword = keyword
                     priority_score = 10
                     break
             
-            # 如果沒有匹配主要關鍵詞，檢查次要關鍵詞
+            # 檢查次要關鍵詞
             if not matched_keyword:
-                for secondary_term in self.secondary_keywords:
-                    if secondary_term in item.title or (item.content and secondary_term in item.content):
-                        matched_keyword = secondary_term
+                for keyword in self.secondary_keywords:
+                    if keyword in item.title or (item.content and keyword in item.content):
+                        matched_keyword = keyword
                         priority_score = 5
                         break
             
-            # 最後檢查原始搜尋關鍵詞
+            # 檢查原始搜尋關鍵詞
             if not matched_keyword:
                 for term in self.search_terms:
                     if term in item.title or (item.content and term in item.content):
@@ -134,9 +115,9 @@ class RssCrawler(BaseCrawler):
                 item.keyword = matched_keyword
                 item.priority_score = priority_score
                 filtered_news.append(item)
-                logger.info(f"符合關鍵詞 '{matched_keyword}' (優先級:{priority_score}) 的新聞: {item.title[:30]}...")
+                logger.info(f"✅ 符合關鍵詞 '{matched_keyword}' (優先級:{priority_score}): {item.title[:40]}...")
         
-        logger.info(f"過濾後剩餘 {len(filtered_news)} 條相關新聞")
+        logger.info(f"🎯 篩選完成，剩餘 {len(filtered_news)} 條相關新聞")
         
         # 按優先級和時間排序
         sorted_news = sorted(filtered_news, key=lambda x: (-getattr(x, 'priority_score', 0), -x.published_time.timestamp()))
@@ -147,17 +128,20 @@ class RssCrawler(BaseCrawler):
         news_items = []
         
         try:
-            # 設置User-Agent，避免被封鎖
+            # 設置User-Agent
             feedparser.USER_AGENT = self.headers["User-Agent"]
             
             # 解析RSS訂閱源
             feed = feedparser.parse(feed_url)
             
             if feed.bozo:
-                logger.warning(f"RSS訂閱源可能有格式問題: {feed_url}")
+                logger.warning(f"⚠️ RSS訂閱源可能有格式問題: {feed_url}")
             
             feed_title = feed.feed.title if hasattr(feed.feed, 'title') else "未知來源"
-            logger.info(f"正在處理 {feed_title} 的 {len(feed.entries)} 條新聞")
+            logger.info(f"📰 正在處理 {feed_title} 的 {len(feed.entries)} 條新聞")
+            
+            processed_count = 0
+            insurance_related_count = 0
             
             for entry in feed.entries:
                 try:
@@ -167,6 +151,8 @@ class RssCrawler(BaseCrawler):
                     
                     if not title or not url:
                         continue
+                    
+                    processed_count += 1
                     
                     # 預篩選：只處理包含保險相關詞彙的標題
                     title_lower = title.lower()
@@ -179,6 +165,9 @@ class RssCrawler(BaseCrawler):
                     # 如果標題不包含保險相關詞彙，跳過
                     if not contains_insurance_keyword:
                         continue
+                    
+                    insurance_related_count += 1
+                    logger.debug(f"🎯 發現保險相關新聞: {title[:50]}...")
                     
                     # 獲取發布時間
                     pub_time = datetime.now()
@@ -195,10 +184,10 @@ class RssCrawler(BaseCrawler):
                     
                     # 檢查時間限制
                     hours_diff = (datetime.now() - pub_time).total_seconds() / 3600
-                    logger.debug(f"新聞時間: {pub_time}, 距現在: {hours_diff:.1f} 小時")
+                    logger.debug(f"📅 新聞時間: {pub_time}, 距現在: {hours_diff:.1f} 小時")
                     
                     if hours_diff > self.hours_limit:
-                        logger.debug(f"跳過，超出時間限制: {self.hours_limit} 小時")
+                        logger.debug(f"⏰ 跳過，超出時間限制: {self.hours_limit} 小時")
                         continue
                     
                     # 獲取內容
@@ -234,20 +223,22 @@ class RssCrawler(BaseCrawler):
                     )
                     
                     news_items.append(news_item)
-                    logger.debug(f"成功解析RSS條目: {title[:30]}...")
+                    logger.debug(f"✅ 成功解析RSS條目: {title[:30]}...")
                     
                 except Exception as e:
-                    logger.warning(f"解析RSS條目時出錯: {str(e)}")
+                    logger.warning(f"⚠️ 解析RSS條目時出錯: {str(e)}")
+            
+            logger.info(f"📊 {feed_title}: 處理了{processed_count}條新聞，找到{insurance_related_count}條保險相關，成功解析{len(news_items)}條")
             
         except Exception as e:
-            logger.error(f"解析RSS訂閱源 '{feed_url}' 時出錯: {str(e)}")
+            logger.error(f"❌ 解析RSS訂閱源 '{feed_url}' 時出錯: {str(e)}")
         
         return news_items
     
     def _get_article_content(self, url: str) -> str:
         """獲取文章內容"""
         try:
-            # 設置隨機延遲，避免被封鎖
+            # 設置延遲，避免被封鎖
             time.sleep(1)
             
             response = requests.get(url, headers=self.headers, timeout=15)
@@ -305,5 +296,5 @@ class RssCrawler(BaseCrawler):
             return content_text
             
         except Exception as e:
-            logger.warning(f"獲取文章內容時出錯: {str(e)}")
+            logger.warning(f"⚠️ 獲取文章內容時出錯: {str(e)}")
             return "無法獲取文章內容"
