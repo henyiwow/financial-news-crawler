@@ -16,7 +16,7 @@ class GoogleNewsCrawler(BaseCrawler):
         super().__init__(config)
         self.base_url = "https://www.google.com/search"
         self.region = config.get('region', 'tw')
-        self.hours_limit = config.get('hours_limit', 48)  # 增加到48小時
+        self.hours_limit = config.get('hours_limit', 24)
         self.max_pages = config.get('max_pages', 3)
         self.headers = {
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
@@ -26,32 +26,28 @@ class GoogleNewsCrawler(BaseCrawler):
         # 專門針對保險的搜尋關鍵詞
         self.insurance_search_terms = [
             # 公司名稱相關
-            "新光人壽 OR 新光金控",
-            "台新人壽 OR 台新金控", 
+            "新光人壽",
+            "台新人壽", 
+            "新光金控",
+            "台新金控",
             
             # 險種相關
-            "健康險 OR 醫療險",
-            "投資型保險 OR 變額保險",
-            "壽險 OR 終身壽險",
-            "利變壽險 OR 利率變動型",
-            "意外險 OR 傷害險",
-            "年金險 OR 退休年金",
-            "儲蓄險 OR 還本險",
+            "健康險 台灣",
+            "醫療險 保險",
+            "投資型保險",
+            "利變壽險",
+            "意外險 理賠",
+            "年金險",
+            "儲蓄險",
             
             # 保險業務
             "保險理賠",
             "保單給付",
             "保險新商品",
-            "保險法規",
-            
-            # 組合搜尋
-            "保險 健康險",
-            "保險 投資型",
-            "壽險 新光",
-            "壽險 台新"
+            "保險法規 台灣"
         ]
         
-        # 優先關鍵詞 - 用於結果排序
+        # 優先關鍵詞
         self.priority_keywords = [
             "新光人壽", "新光金控", "台新人壽", "台新金控",
             "健康險", "投資型保險", "利變壽險", "意外險"
@@ -61,27 +57,27 @@ class GoogleNewsCrawler(BaseCrawler):
         """爬取Google新聞"""
         all_news = []
         
-        # 使用專門的保險搜尋關鍵詞
+        # 合併專門的保險搜尋關鍵詞和原始關鍵詞
         search_terms = self.insurance_search_terms + self.search_terms
         
         for term in search_terms:
-            logger.info(f"搜尋關鍵詞: {term}")
+            logger.info(f"🔍 Google搜尋關鍵詞: {term}")
             try:
                 news_items = self._search_term_multiple_pages(term)
                 all_news.extend(news_items)
                 
-                # 避免被Google封鎖，增加隨機延遲
+                # 避免被Google封鎖
                 time.sleep(random.uniform(3, 6))
             except Exception as e:
-                logger.error(f"爬取關鍵詞 '{term}' 時出錯: {str(e)}")
+                logger.error(f"❌ 爬取關鍵詞 '{term}' 時出錯: {str(e)}")
         
         # 去重複
         unique_news = self._remove_duplicates(all_news)
-        logger.info(f"去重後剩餘 {len(unique_news)} 條新聞")
+        logger.info(f"🔄 去重後剩餘 {len(unique_news)} 條新聞")
         
         # 過濾保險相關新聞
         filtered_news = self._filter_insurance_news(unique_news)
-        logger.info(f"過濾後剩餘 {len(filtered_news)} 條保險相關新聞")
+        logger.info(f"🎯 過濾後剩餘 {len(filtered_news)} 條保險相關新聞")
         
         # 根據優先順序排序
         sorted_news = self.sort_by_priority(filtered_news)
@@ -138,7 +134,7 @@ class GoogleNewsCrawler(BaseCrawler):
                 item.keyword = matched_keyword
                 item.priority_score = priority_score
                 filtered_news.append(item)
-                logger.info(f"保險相關新聞: {item.title[:30]}...")
+                logger.debug(f"✅ 保險相關新聞: {item.title[:30]}...")
         
         return filtered_news
     
@@ -147,7 +143,7 @@ class GoogleNewsCrawler(BaseCrawler):
         all_news = []
         
         for page in range(self.max_pages):
-            logger.info(f"搜尋關鍵詞 '{term}' 第 {page + 1} 頁")
+            logger.debug(f"🔍 搜尋關鍵詞 '{term}' 第 {page + 1} 頁")
             
             try:
                 news_items = self._search_term(term, page)
@@ -155,7 +151,7 @@ class GoogleNewsCrawler(BaseCrawler):
                 
                 # 如果沒有找到新聞，提前結束
                 if not news_items:
-                    logger.info(f"關鍵詞 '{term}' 第 {page + 1} 頁無結果，停止搜尋")
+                    logger.debug(f"⚠️ 關鍵詞 '{term}' 第 {page + 1} 頁無結果，停止搜尋")
                     break
                 
                 # 頁面間延遲
@@ -163,10 +159,10 @@ class GoogleNewsCrawler(BaseCrawler):
                     time.sleep(random.uniform(2, 4))
                     
             except Exception as e:
-                logger.error(f"搜尋關鍵詞 '{term}' 第 {page + 1} 頁時出錯: {str(e)}")
+                logger.error(f"❌ 搜尋關鍵詞 '{term}' 第 {page + 1} 頁時出錯: {str(e)}")
                 break
         
-        logger.info(f"關鍵詞 '{term}' 總共找到 {len(all_news)} 條新聞")
+        logger.debug(f"📊 關鍵詞 '{term}' 總共找到 {len(all_news)} 條新聞")
         return all_news
     
     def _search_term(self, term: str, page: int = 0) -> List[NewItem]:
@@ -175,9 +171,9 @@ class GoogleNewsCrawler(BaseCrawler):
         
         # 構建更精確的查詢參數
         params = {
-            "q": f"{term} site:tw",  # 限制台灣網站
+            "q": f"{term} site:tw OR site:com.tw",  # 限制台灣網站
             "tbm": "nws",  # 新聞搜尋
-            "tbs": "qdr:w2",  # 最近2週
+            "tbs": "qdr:d",  # 最近1天
             "hl": "zh-TW",  # 語言
             "gl": "tw",     # 地區：台灣
             "start": page * 10,  # 分頁參數
@@ -209,14 +205,14 @@ class GoogleNewsCrawler(BaseCrawler):
                 elements = soup.select(selector)
                 if elements:
                     news_divs = elements
-                    logger.info(f"第 {page + 1} 頁找到選擇器 {selector} 的新聞元素: {len(elements)} 個")
+                    logger.debug(f"🔍 第 {page + 1} 頁找到選擇器 {selector} 的新聞元素: {len(elements)} 個")
                     break
             
             if not news_divs:
                 # 更通用的方法
                 news_divs = soup.find_all("div", recursive=True, limit=50)
                 news_divs = [div for div in news_divs if div.find("a") and div.find("h3")]
-                logger.info(f"第 {page + 1} 頁使用通用方法找到 {len(news_divs)} 個可能的新聞元素")
+                logger.debug(f"🔍 第 {page + 1} 頁使用通用方法找到 {len(news_divs)} 個可能的新聞元素")
             
             count = 0
             for div in news_divs:
@@ -255,7 +251,7 @@ class GoogleNewsCrawler(BaseCrawler):
                                 if "url" in parsed and parsed["url"]:
                                     url = parsed["url"][0]
                             except Exception as e:
-                                logger.warning(f"解析URL時出錯: {str(e)}")
+                                logger.warning(f"⚠️ 解析URL時出錯: {str(e)}")
                     
                     # 尋找來源
                     source_elements = [
@@ -278,21 +274,6 @@ class GoogleNewsCrawler(BaseCrawler):
                                 source = source.split("http")[0].strip()
                             break
                     
-                    # 尋找時間
-                    time_elements = [
-                        div.find("div", class_="OSrXXb"),
-                        div.find("span", class_="WG9SHc"),
-                        div.find("time"),
-                        div.find("span", class_="f"),
-                        div.find("div", class_="slp"),
-                        div.find(["span", "div"], string=lambda s: "前" in s if s else False),
-                    ]
-                    
-                    for element in time_elements:
-                        if element and element.get_text().strip():
-                            time_text = element.get_text().strip()
-                            break
-                    
                     # 確保所有必需元素都存在
                     if not title or not url:
                         continue
@@ -313,29 +294,10 @@ class GoogleNewsCrawler(BaseCrawler):
                     
                     # 解析發布時間
                     pub_time = datetime.now()
-                    if time_text:
-                        try:
-                            if "小時前" in time_text:
-                                hours = int(''.join(filter(str.isdigit, time_text)))
-                                pub_time = datetime.now() - timedelta(hours=hours)
-                            elif "分鐘前" in time_text:
-                                minutes = int(''.join(filter(str.isdigit, time_text)))
-                                pub_time = datetime.now() - timedelta(minutes=minutes)
-                            elif "天前" in time_text:
-                                days = int(''.join(filter(str.isdigit, time_text)))
-                                pub_time = datetime.now() - timedelta(days=days)
-                            elif "週前" in time_text or "周前" in time_text:
-                                weeks = int(''.join(filter(str.isdigit, time_text)))
-                                pub_time = datetime.now() - timedelta(weeks=weeks)
-                        except ValueError:
-                            logger.debug(f"無法解析時間文本: {time_text}")
                     
                     # 檢查時間限制
                     hours_diff = (datetime.now() - pub_time).total_seconds() / 3600
-                    logger.debug(f"新聞時間: {pub_time}, 距現在: {hours_diff:.1f} 小時")
-                    
                     if hours_diff > self.hours_limit:
-                        logger.debug(f"跳過，超出時間限制: {self.hours_limit} 小時")
                         continue
                     
                     # 清理標題
@@ -358,13 +320,13 @@ class GoogleNewsCrawler(BaseCrawler):
                     
                     news_items.append(news_item)
                     count += 1
-                    logger.debug(f"成功解析新聞: {title[:30]}...")
+                    logger.debug(f"✅ 成功解析新聞: {title[:30]}...")
                     
                 except Exception as e:
-                    logger.warning(f"解析新聞時出錯: {str(e)}")
+                    logger.warning(f"⚠️ 解析新聞時出錯: {str(e)}")
             
         except requests.RequestException as e:
-            logger.error(f"請求Google新聞時出錯: {str(e)}")
+            logger.error(f"❌ 請求Google新聞時出錯: {str(e)}")
         
         return news_items
     
@@ -385,7 +347,7 @@ class GoogleNewsCrawler(BaseCrawler):
                 seen_urls.add(news.url)
                 unique_news.append(news)
             else:
-                logger.debug(f"移除重複新聞: {news.title[:30]}...")
+                logger.debug(f"🔄 移除重複新聞: {news.title[:30]}...")
         
         return unique_news
     
@@ -448,5 +410,5 @@ class GoogleNewsCrawler(BaseCrawler):
             return content_text
         
         except Exception as e:
-            logger.warning(f"獲取文章內容時出錯: {str(e)}")
+            logger.warning(f"⚠️ 獲取文章內容時出錯: {str(e)}")
             return "無法獲取文章內容"
