@@ -3,306 +3,256 @@ from typing import Dict, Any
 from loguru import logger
 
 class TextSummarizer:
-    """優化版文字摘要器 - 專注保險新聞摘要"""
+    """修正版文字摘要器 - 解決逗號問題"""
     
     def __init__(self, config: Dict[str, Any]):
         self.config = config
-        self.max_length = config.get('max_length', 150)
+        self.max_length = config.get('max_length', 120)
         self.language = config.get('language', 'zh-TW')
         self.summary_type = config.get('type', 'simple')
         
-        # 簡單摘要設定
-        self.simple_config = config.get('simple_summary', {
-            'max_sentences': 3,
-            'min_length': 60,
-            'keywords_highlight': True
-        })
-        
         # 保險相關關鍵詞
         self.insurance_keywords = [
-            # 公司名稱
-            '新光人壽', '台新人壽', '新光金控', '台新金控', '新光金', '台新金',
-            
-            # 險種
-            '保險', '壽險', '健康險', '醫療險', '意外險', '投資型保險', '利變壽險',
-            '年金險', '儲蓄險', '癌症險', '重大疾病險', '實支實付',
-            
-            # 業務關鍵詞
-            '理賠', '給付', '保費', '保單', '承保', '核保', '要保人', '被保險人', '受益人',
-            
-            # 重要動詞
-            '推出', '發布', '宣布', '提供', '調整', '增加', '減少', '暫停', '恢復'
+            '新光人壽', '台新人壽', '新光金控', '台新金控',
+            '保險', '壽險', '健康險', '醫療險', '意外險', '投資型保險', 
+            '利變壽險', '年金險', '儲蓄險', '理賠', '給付', '保費', '保單'
         ]
         
-        # 重要數字模式
-        self.number_patterns = [
-            r'\d+億元?', r'\d+萬元?', r'\d+元', r'\d+%', r'\d+倍',
-            r'\d+年', r'\d+月', r'\d+日', r'\d+歲'
-        ]
-        
-        logger.info(f"📝 摘要器初始化完成，類型: {self.summary_type}, 最大長度: {self.max_length}")
+        logger.info(f"📝 摘要器初始化完成，最大長度: {self.max_length}")
     
     def summarize(self, content: str) -> str:
-        """生成摘要"""
-        if not content or len(content.strip()) < 10:
+        """生成摘要 - 修正版"""
+        if not content or len(content.strip()) < 20:
             return "內容過短，無法生成摘要"
         
         try:
-            if self.summary_type == 'simple':
-                return self._simple_summarize(content)
-            else:
-                # 如果設定了AI摘要但無法使用，回退到簡單摘要
-                return self._simple_summarize(content)
+            # 使用簡化但穩定的摘要方法
+            return self._create_clean_summary(content)
                 
         except Exception as e:
             logger.error(f"❌ 摘要生成失敗: {str(e)}")
-            return self._fallback_summary(content)
+            return self._simple_fallback(content)
     
-    def _simple_summarize(self, content: str) -> str:
-        """智能簡單摘要方法"""
+    def _create_clean_summary(self, content: str) -> str:
+        """創建乾淨的摘要"""
         try:
-            # 清理內容
-            cleaned_content = self._clean_content(content)
+            # 1. 清理內容
+            cleaned_content = self._deep_clean_content(content)
             
-            # 分割句子
-            sentences = self._split_sentences(cleaned_content)
+            # 2. 分割成有意義的句子
+            sentences = self._extract_meaningful_sentences(cleaned_content)
             
             if not sentences:
-                return self._fallback_summary(content)
+                return self._simple_fallback(content)
             
-            # 計算句子分數
-            sentence_scores = self._calculate_sentence_scores(sentences)
+            # 3. 選擇最重要的1-2句
+            important_sentences = self._select_best_sentences(sentences)
             
-            # 選擇最重要的句子
-            important_sentences = self._select_important_sentences(
-                sentences, sentence_scores
-            )
+            # 4. 組合成摘要
+            summary = self._build_summary(important_sentences)
             
-            # 組合摘要
-            summary = self._combine_summary(important_sentences)
-            
-            # 限制長度
-            if len(summary) > self.max_length:
-                summary = summary[:self.max_length-3] + "..."
-            
-            # 確保最少長度
-            if len(summary) < self.simple_config['min_length']:
-                summary = self._expand_summary(sentences, summary)
-            
-            # 最終檢查和優化
-            summary = self._optimize_summary(summary)
+            # 5. 最終清理
+            summary = self._final_cleanup(summary)
             
             return summary
             
         except Exception as e:
-            logger.error(f"❌ 簡單摘要生成失敗: {str(e)}")
-            return self._fallback_summary(content)
+            logger.error(f"❌ 創建摘要失敗: {str(e)}")
+            return self._simple_fallback(content)
     
-    def _clean_content(self, content: str) -> str:
-        """清理內容"""
-        # 移除多餘的空白
-        content = re.sub(r'\s+', ' ', content)
+    def _deep_clean_content(self, content: str) -> str:
+        """深度清理內容"""
+        # 移除HTML標籤
+        content = re.sub(r'<[^>]+>', '', content)
         
-        # 移除常見的網頁元素
-        patterns_to_remove = [
-            r'點擊看更多.*?$',
-            r'繼續閱讀.*?$',
-            r'更多新聞.*?$',
-            r'相關新聞.*?$',
-            r'廣告.*?$',
-            r'AD.*?$',
+        # 移除多餘空白和特殊字符
+        content = re.sub(r'\s+', ' ', content)
+        content = re.sub(r'[^\u4e00-\u9fff\w\s。！？；：，（）「」『』""''．]', '', content)
+        
+        # 移除常見無用文字
+        remove_patterns = [
+            r'點擊.*?更多',
+            r'繼續閱讀.*',
+            r'更多新聞.*',
             r'記者.*?報導',
+            r'【.*?】',
             r'\[.*?\]',
-            r'【.*?】(?!.*保險)',  # 保留包含保險的標籤
-            r'圖片來源.*?$',
-            r'資料來源.*?$',
+            r'圖片來源.*',
+            r'資料來源.*',
+            r'廣告.*',
+            r'AD.*'
         ]
         
-        for pattern in patterns_to_remove:
-            content = re.sub(pattern, '', content, flags=re.MULTILINE)
+        for pattern in remove_patterns:
+            content = re.sub(pattern, '', content, flags=re.IGNORECASE)
         
         return content.strip()
     
-    def _split_sentences(self, content: str) -> list:
-        """分割句子"""
-        # 中文句子分割
-        sentences = re.split(r'[。！？；]', content)
+    def _extract_meaningful_sentences(self, content: str) -> list:
+        """提取有意義的句子"""
+        # 按句號分割
+        sentences = re.split(r'[。！？]', content)
         
-        # 過濾短句子和空句子
-        sentences = [s.strip() for s in sentences if len(s.strip()) > 8]
+        meaningful_sentences = []
         
-        # 移除明顯的無關句子
-        filtered_sentences = []
         for sentence in sentences:
-            # 跳過太短或太長的句子
-            if len(sentence) < 10 or len(sentence) > 200:
-                continue
-            
-            # 跳過明顯的廣告或導航文字
-            if any(word in sentence for word in ['點擊', '更多', '廣告', '登入', '註冊', '訂閱']):
-                continue
-            
-            filtered_sentences.append(sentence)
-        
-        return filtered_sentences
-    
-    def _calculate_sentence_scores(self, sentences: list) -> dict:
-        """計算句子重要性分數"""
-        scores = {}
-        
-        for i, sentence in enumerate(sentences):
-            score = 0
-            sentence_lower = sentence.lower()
-            
-            # 位置分數（開頭的句子更重要）
-            if i == 0:
-                score += 5
-            elif i == 1:
-                score += 3
-            elif i < len(sentences) * 0.3:  # 前30%的句子
-                score += 2
-            
-            # 保險關鍵詞分數（根據重要性加權）
-            for keyword in self.insurance_keywords:
-                if keyword in sentence:
-                    if keyword in ['新光人壽', '台新人壽', '新光金控', '台新金控']:
-                        score += 5  # 公司名稱高分
-                    elif keyword in ['健康險', '醫療險', '投資型保險', '利變壽險', '意外險']:
-                        score += 4  # 主要險種
-                    elif keyword in ['理賠', '給付', '推出', '發布', '宣布']:
-                        score += 3  # 重要動作
-                    else:
-                        score += 2  # 一般保險詞彙
-            
-            # 數字和統計資料分數
-            for pattern in self.number_patterns:
-                if re.search(pattern, sentence):
-                    score += 2
-            
-            # 包含重要動詞的分數
-            important_verbs = [
-                '宣布', '推出', '發布', '提供', '調整', '增加', '減少',
-                '理賠', '給付', '承保', '拒保', '暫停', '恢復', '修正'
-            ]
-            for verb in important_verbs:
-                if verb in sentence:
-                    score += 2
-            
-            # 句子長度分數（適中長度加分）
-            if 20 <= len(sentence) <= 100:
-                score += 1
-            elif len(sentence) > 150:
-                score -= 1  # 太長的句子扣分
-            
-            # 包含引號的句子（可能是重要聲明）
-            if '「' in sentence or '『' in sentence or '"' in sentence:
-                score += 1
-            
-            # 包含具體時間的句子
-            if re.search(r'\d{4}年|\d+月\d+日|今年|明年|去年', sentence):
-                score += 1
-            
-            scores[i] = score
-        
-        return scores
-    
-    def _select_important_sentences(self, sentences: list, scores: dict) -> list:
-        """選擇重要句子"""
-        max_sentences = self.simple_config['max_sentences']
-        
-        # 按分數排序
-        sorted_indices = sorted(scores.keys(), key=lambda x: scores[x], reverse=True)
-        
-        # 選擇前N個句子，但確保第一句總是被包含（如果分數不太低）
-        selected_indices = []
-        
-        # 優先選擇高分句子
-        for idx in sorted_indices:
-            if len(selected_indices) >= max_sentences:
-                break
-            selected_indices.append(idx)
-        
-        # 按原始順序排列
-        selected_indices.sort()
-        
-        return [sentences[i] for i in selected_indices if i < len(sentences)]
-    
-    def _combine_summary(self, sentences: list) -> str:
-        """組合摘要"""
-        if not sentences:
-            return "無法生成摘要"
-        
-        # 確保句子之間的邏輯連接
-        summary_parts = []
-        
-        for i, sentence in enumerate(sentences):
-            # 清理句子
             sentence = sentence.strip()
             
-            # 確保句子結尾正確
+            # 過濾條件
+            if len(sentence) < 15:  # 太短
+                continue
+            if len(sentence) > 150:  # 太長
+                continue
+            if not any(keyword in sentence for keyword in ['保險', '壽險', '新光', '台新', '理賠', '保單', '醫療', '健康', '意外', '投資']):
+                continue
+            
+            # 移除開頭的連接詞
+            sentence = re.sub(r'^[，,、而且此外另外同時]', '', sentence)
+            sentence = sentence.strip()
+            
+            if sentence:
+                meaningful_sentences.append(sentence)
+        
+        return meaningful_sentences
+    
+    def _select_best_sentences(self, sentences: list) -> list:
+        """選擇最佳句子"""
+        if not sentences:
+            return []
+        
+        # 計算每個句子的分數
+        scored_sentences = []
+        
+        for sentence in sentences:
+            score = 0
+            
+            # 包含公司名稱加分
+            if any(company in sentence for company in ['新光人壽', '台新人壽', '新光金控', '台新金控']):
+                score += 10
+            
+            # 包含具體險種加分
+            if any(product in sentence for product in ['健康險', '醫療險', '投資型保險', '利變壽險', '意外險']):
+                score += 8
+            
+            # 包含重要動作加分
+            if any(action in sentence for action in ['推出', '發布', '宣布', '理賠', '給付', '調整']):
+                score += 6
+            
+            # 包含數字資訊加分
+            if re.search(r'\d+[億萬元%]', sentence):
+                score += 4
+            
+            # 句子長度適中加分
+            if 20 <= len(sentence) <= 80:
+                score += 2
+            
+            scored_sentences.append((sentence, score))
+        
+        # 按分數排序，取前2句
+        scored_sentences.sort(key=lambda x: x[1], reverse=True)
+        
+        # 最多取2句，總長度不超過限制
+        selected = []
+        total_length = 0
+        
+        for sentence, score in scored_sentences[:3]:
+            if total_length + len(sentence) <= self.max_length - 10:
+                selected.append(sentence)
+                total_length += len(sentence)
+                
+                if len(selected) >= 2:  # 最多2句
+                    break
+        
+        return selected
+    
+    def _build_summary(self, sentences: list) -> str:
+        """構建摘要"""
+        if not sentences:
+            return "無法提取關鍵資訊"
+        
+        # 清理每個句子並組合
+        clean_sentences = []
+        
+        for sentence in sentences:
+            # 移除句子開頭的逗號和連接詞
+            sentence = re.sub(r'^[，,、]', '', sentence)
+            sentence = sentence.strip()
+            
+            # 確保句子有適當結尾
             if not sentence.endswith(('。', '！', '？')):
                 sentence += '。'
             
-            summary_parts.append(sentence)
+            clean_sentences.append(sentence)
         
-        summary = ''.join(summary_parts)
+        # 用句號連接（不用逗號）
+        summary = ''.join(clean_sentences)
+        
         return summary
     
-    def _expand_summary(self, sentences: list, current_summary: str) -> str:
-        """擴展摘要（如果太短）"""
-        if len(current_summary) >= self.simple_config['min_length']:
-            return current_summary
+    def _final_cleanup(self, summary: str) -> str:
+        """最終清理"""
+        # 移除多餘的逗號
+        summary = re.sub(r'，+', '，', summary)
+        summary = re.sub(r',+', '，', summary)
         
-        # 找到更多相關句子
-        additional_sentences = []
-        current_length = len(current_summary)
+        # 移除句子間的逗號（這是造成問題的主因）
+        summary = re.sub(r'。，', '。', summary)
+        summary = re.sub(r'，(?=[。！？])', '', summary)
         
-        for sentence in sentences:
-            if sentence not in current_summary and current_length < self.max_length:
-                # 檢查是否包含保險關鍵詞
-                if any(keyword in sentence for keyword in self.insurance_keywords):
-                    additional_sentences.append(sentence)
-                    current_length += len(sentence)
-                    if len(additional_sentences) >= 2:  # 最多加2句
-                        break
-        
-        if additional_sentences:
-            expanded = current_summary.rstrip('。') + '。' + ''.join([s + '。' if not s.endswith(('。', '！', '？')) else s for s in additional_sentences])
-            return expanded
-        
-        return current_summary
-    
-    def _optimize_summary(self, summary: str) -> str:
-        """優化摘要"""
         # 移除重複的句號
         summary = re.sub(r'。+', '。', summary)
         
-        # 確保摘要以句號結尾
+        # 移除開頭和結尾的標點符號
+        summary = re.sub(r'^[，,。]', '', summary)
+        
+        # 確保結尾正確
         if not summary.endswith(('。', '！', '？')):
             summary += '。'
         
-        # 移除開頭和結尾的空白
-        summary = summary.strip()
-        
-        return summary
-    
-    def _fallback_summary(self, content: str) -> str:
-        """備用摘要方法"""
-        try:
-            # 簡單地取前100字，並在適當位置截斷
-            cleaned = self._clean_content(content)
-            if len(cleaned) <= self.max_length:
-                return cleaned
-            
-            # 找到第一個句號位置
-            truncated = cleaned[:self.max_length]
+        # 長度控制
+        if len(summary) > self.max_length:
+            # 在適當位置截斷
+            truncated = summary[:self.max_length]
             last_period = truncated.rfind('。')
-            
-            if last_period > 50:  # 確保有足夠內容
-                return truncated[:last_period + 1]
+            if last_period > 30:
+                summary = truncated[:last_period + 1]
             else:
-                return truncated[:self.max_length - 3] + "..."
-                
+                summary = truncated[:self.max_length - 3] + '...'
+        
+        return summary.strip()
+    
+    def _simple_fallback(self, content: str) -> str:
+        """簡單備用方案"""
+        try:
+            # 清理內容
+            content = re.sub(r'<[^>]+>', '', content)
+            content = re.sub(r'\s+', ' ', content)
+            
+            # 找第一個包含保險關鍵詞的段落
+            sentences = content.split('。')
+            
+            for sentence in sentences:
+                sentence = sentence.strip()
+                if (len(sentence) > 20 and 
+                    any(keyword in sentence for keyword in self.insurance_keywords)):
+                    
+                    # 清理並返回
+                    sentence = re.sub(r'^[，,、]', '', sentence)
+                    if not sentence.endswith(('。', '！', '？')):
+                        sentence += '。'
+                    
+                    if len(sentence) > self.max_length:
+                        sentence = sentence[:self.max_length - 3] + '...'
+                    
+                    return sentence
+            
+            # 如果找不到，返回前80字
+            clean_content = content[:80].strip()
+            if not clean_content.endswith(('。', '！', '？')):
+                clean_content += '...'
+            
+            return clean_content
+            
         except Exception as e:
-            logger.error(f"❌ 備用摘要也失敗: {str(e)}")
-            return "摘要生成失敗，請查看原文"
+            logger.error(f"❌ 備用方案失敗: {str(e)}")
+            return "無法生成摘要，請查看原文。"
