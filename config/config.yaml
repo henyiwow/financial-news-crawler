@@ -1,4 +1,4 @@
-# 優化後的保險新聞爬蟲配置
+# 保險新聞爬蟲優化配置檔案
 crawler:
   # 啟用的爬蟲來源（按優先順序排列）
   sources:
@@ -6,42 +6,45 @@ crawler:
     - google_news      # Google新聞爬蟲
     - rss              # RSS爬蟲
 
-  # 主要搜尋關鍵詞 - 專注保險相關
+  # 專注保險的搜尋關鍵詞
   search_terms:
-    # 指定公司
+    # 指定公司（最高優先級）
     - "新光人壽"
+    - "台新人壽"
     - "新光金控"
-    - "台新人壽"  
     - "台新金控"
     
     # 核心險種
     - "健康險"
-    - "醫療險"
+    - "醫療險"  
     - "投資型保險"
     - "利變壽險"
     - "意外險"
     - "年金險"
     - "儲蓄險"
-    - "重大疾病險"
     - "癌症險"
+    - "重大疾病險"
+    - "實支實付"
     
-    # 保險業務
+    # 保險業務關鍵詞
     - "保險理賠"
-    - "保單給付"
+    - "保險給付"
     - "保險新商品"
+    - "保單"
+    - "保費"
 
-  # 時間限制（小時）
-  hours_limit: 48
+  # 時間限制：24小時
+  hours_limit: 24
 
   # Google新聞設定
-  max_pages: 3
-  max_news_per_term: 10
+  max_pages: 4
+  max_news_per_term: 12
   region: "tw"
-  time_period: "w"  # w=一週, d=一天, h=一小時
+  time_period: "d"  # d=一天
 
-  # RSS 訂閱源 - 增加保險專業媒體
+  # RSS訂閱源 - 專注大型財經媒體
   rss_feeds:
-    # 財經媒體
+    # 主流財經媒體
     - "https://ec.ltn.com.tw/rss/finance.xml"           # 自由時報財經
     - "https://www.chinatimes.com/rss/finance.xml"      # 中國時報財經
     - "https://news.cnyes.com/rss/news/cat/tw_stock"    # 鉅亨網台股
@@ -49,100 +52,97 @@ crawler:
     - "https://udn.com/rssfeed/news/2/6638?ch=news"     # 聯合報金融要聞
     - "https://money.udn.com/rssfeed/news/1001/5590/12017?ch=money"  # 經濟日報財經
     - "https://ctee.com.tw/feed"                        # 工商時報
-    
-    # 保險專業媒體
-    - "https://www.rmim.com.tw/rss/news"                # 保險雜誌
-    - "https://www.advisers.com.tw/rss"                 # 保險行銷雜誌（如果有RSS）
+    - "https://www.wealth.com.tw/rss/category/4"        # 財訊快報
 
 # 摘要器設定
 summarizer:
-  model: "gpt-3.5-turbo"  # 或使用其他模型
-  max_length: 150         # 摘要最大長度
-  language: "zh-TW"       # 繁體中文
+  type: "simple"        # 使用簡單摘要器
+  max_length: 150       # 摘要最大長度
+  language: "zh-TW"     # 繁體中文
   
-  # 摘要提示詞模板
-  prompt_template: |
-    請為以下保險新聞生成簡潔的摘要，重點關注：
-    1. 主要事件或政策變化
-    2. 對保險業或消費者的影響
-    3. 涉及的保險公司或產品
-    
-    新聞內容：{content}
-    
-    請用繁體中文提供80-120字的摘要：
+  # 簡單摘要設定
+  simple_summary:
+    max_sentences: 3    # 最多3個句子
+    min_length: 60      # 最少60字
+    keywords_highlight: true
 
 # LINE通知設定
 line_notify:
-  # LINE Bot 相關設定
+  # LINE Bot相關設定（請設置環境變數）
   channel_access_token: "${LINE_CHANNEL_ACCESS_TOKEN}"
   channel_secret: "${LINE_CHANNEL_SECRET}"
   
   # 推播設定
   broadcast_enabled: true
-  max_news_per_push: 5     # 每次推播最多5則新聞
+  max_news_per_push: 8    # 每次推播最多8則新聞
   
-  # 訊息格式設定
+  # 訊息格式
   message_template: |
-    📰 【保險新聞摘要】
-    
-    🏢 {source}
-    📅 {published_time}
+    📰 【保險新聞】{keyword}
     
     📋 {title}
     
-    💡 {summary}
+    📝 摘要：{summary}
     
-    🔗 詳細內容: {url}
+    🏢 來源：{source}
+    📅 時間：{published_time}
+    🔗 {url}
     
-    #保險新聞 #{keyword}
+    ────────────────
 
   # 推播時間設定
   push_times:
     - "08:00"  # 早上8點
-    - "18:00"  # 下午6點
 
 # 日誌設定
 logging:
   level: "INFO"
-  format: "{time} | {level} | {message}"
+  format: "{time:YYYY-MM-DD HH:mm:ss} | {level} | {message}"
   rotation: "1 day"
   retention: "7 days"
-  
-# 資料庫設定（如果需要儲存新聞記錄）
-database:
-  enabled: false
-  type: "sqlite"
-  path: "news_database.db"
 
-# 過濾設定
+# 過濾設定 - 放寬條件以獲得更多新聞
 filters:
-  # 最少新聞數量（如果少於此數量，會放寬篩選條件）
-  min_news_count: 3
+  # 最少新聞數量
+  min_news_count: 1
   
-  # 排除關鍵詞
+  # 排除關鍵詞（減少以避免過度篩選）
   exclude_keywords:
-    - "股價"
-    - "配息" 
-    - "除權"
-    - "除息"
-    - "ETF"
-    - "基金"
-    - "債券"
-    - "銀行存款"
-    - "信用卡"
-    - "房貸"
-    - "車貸"
+    - "股價上漲"
+    - "股價下跌"
+    - "配息公告"
+    - "除權除息"
+    - "股東大會"
   
-  # 必須包含的關鍵詞（至少一個）
+  # 必須包含的關鍵詞（放寬條件）
   required_keywords:
     - "保險"
-    - "壽險" 
+    - "壽險"
     - "新光"
     - "台新"
     - "理賠"
     - "保單"
-    - "健康險"
-    - "意外險"
-    - "醫療險"
+    - "醫療"
+    - "健康"
+    - "意外"
     - "投資型"
     - "年金"
+    - "儲蓄"
+    - "保費"
+    - "給付"
+    - "承保"
+    - "核保"
+
+# 優先級設定
+priority:
+  # 公司名稱權重
+  company_weight: 10
+  
+  # 險種權重  
+  product_weight: 8
+  
+  # 業務關鍵詞權重
+  business_weight: 6
+  
+  # 一般保險關鍵詞權重
+  general_weight: 3
