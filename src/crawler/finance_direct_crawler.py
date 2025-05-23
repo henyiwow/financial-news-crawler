@@ -15,7 +15,7 @@ class FinanceNewsDirectCrawler(BaseCrawler):
     
     def __init__(self, config: Dict[str, Any]):
         super().__init__(config)
-        self.hours_limit = config.get('hours_limit', 48)  # 增加到48小時
+        self.hours_limit = config.get('hours_limit', 24)
         self.headers = {
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
             "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
@@ -27,39 +27,24 @@ class FinanceNewsDirectCrawler(BaseCrawler):
         # 擴充保險相關新聞網站
         self.sites = [
             {
-                "name": "鉅亨網-保險專區",
-                "url": "https://news.cnyes.com/news/cat/tw_insurance",
-                "article_selector": "a.theme-list-title, a[href*='news']",
-                "title_selector": "h3, h2, .title",
-                "time_selector": "time, .time",
-                "time_format": "%Y/%m/%d %H:%M",
-                "base_url": "https://news.cnyes.com"
-            },
-            {
                 "name": "鉅亨網-台股",
                 "url": "https://news.cnyes.com/news/cat/tw_stock",
                 "article_selector": "a.theme-list-title, a[href*='news']",
                 "title_selector": "h3, h2, .title",
-                "time_selector": "time, .time",
-                "time_format": "%Y/%m/%d %H:%M",
                 "base_url": "https://news.cnyes.com"
             },
             {
-                "name": "經濟日報-財經",
+                "name": "經濟日報-財經", 
                 "url": "https://money.udn.com/money/cate/12017",
                 "article_selector": "a[href*='story'], a[href*='news']",
                 "title_selector": "h3, h2, .title",
-                "time_selector": ".time, .date",
-                "time_format": "%Y-%m-%d %H:%M",
                 "base_url": "https://money.udn.com"
             },
             {
                 "name": "經濟日報-金融",
-                "url": "https://money.udn.com/money/cate/12016",
+                "url": "https://money.udn.com/money/cate/12016", 
                 "article_selector": "a[href*='story'], a[href*='news']",
                 "title_selector": "h3, h2, .title",
-                "time_selector": ".time, .date",
-                "time_format": "%Y-%m-%d %H:%M",
                 "base_url": "https://money.udn.com"
             },
             {
@@ -67,17 +52,13 @@ class FinanceNewsDirectCrawler(BaseCrawler):
                 "url": "https://ec.ltn.com.tw/",
                 "article_selector": "a.tit, a[href*='news']",
                 "title_selector": "self",
-                "time_selector": ".time",
-                "time_format": "%Y/%m/%d %H:%M",
                 "base_url": "https://ec.ltn.com.tw"
             },
             {
                 "name": "工商時報-財經",
                 "url": "https://ctee.com.tw/category/financial",
                 "article_selector": "a[href*='news'], .post-title a",
-                "title_selector": "self",
-                "time_selector": ".time, .date",
-                "time_format": "%Y-%m-%d %H:%M:%S",
+                "title_selector": "self", 
                 "base_url": "https://ctee.com.tw"
             },
             {
@@ -85,63 +66,31 @@ class FinanceNewsDirectCrawler(BaseCrawler):
                 "url": "https://www.moneydj.com/",
                 "article_selector": "a[href*='news']",
                 "title_selector": "self",
-                "time_selector": ".time, .date",
-                "time_format": "%Y-%m-%d %H:%M:%S",
                 "base_url": "https://www.moneydj.com"
-            },
-            {
-                "name": "保險雜誌",
-                "url": "https://www.rmim.com.tw/news/",
-                "article_selector": "a[href*='news']",
-                "title_selector": "self",
-                "time_selector": ".time, .date",
-                "time_format": "%Y-%m-%d",
-                "base_url": "https://www.rmim.com.tw"
             }
         ]
         
-        # 重新整理保險關鍵詞 - 更精確的匹配
-        self.primary_insurance_keywords = [
-            # 指定公司
-            "新光人壽", "新光金控", "新光金", "新光保險", 
-            "台新人壽", "台新金控", "台新金", "台新保險",
+        # 保險關鍵詞（按優先級排序）
+        self.primary_keywords = [
+            # 公司名稱（最高優先級）
+            "新光人壽", "新光金控", "新光金", "台新人壽", "台新金控", "台新金",
             
-            # 具體險種
+            # 具體險種（高優先級）
             "健康險", "醫療險", "癌症險", "重大疾病險", "實支實付",
-            "投資型保險", "投資型", "變額保險", "變額萬能",
-            "壽險", "終身壽險", "定期壽險", "終身險",
-            "利變壽險", "利率變動型", "利變險", "增額終身",
-            "意外險", "傷害險", "意外醫療", "意外死殘",
-            "年金險", "即期年金", "遞延年金", "退休年金",
-            "儲蓄險", "還本險", "生存險",
-            
-            # 保險業務相關
-            "理賠", "給付", "保險金", "死亡給付", "生存給付",
-            "保費", "保單", "投保", "承保", "核保",
-            "要保人", "被保險人", "受益人",
-            "保險期間", "保險金額", "保障額度",
-            
-            # 監理法規
-            "保險法", "保險業法", "RBC", "清償能力",
-            "保險局", "金管會保險局", "保險監理",
-            "IFRS17", "會計準則"
+            "投資型保險", "投資型", "變額保險", "利變壽險", "利率變動型",
+            "意外險", "傷害險", "年金險", "儲蓄險", "終身壽險"
         ]
         
-        # 次要關鍵詞 - 保險業相關但不是核心
         self.secondary_keywords = [
-            "保險業", "保險公司", "人壽保險", "產險", "壽險業",
-            "保險密度", "保險滲透率", "保險市場",
-            "再保險", "保險經紀", "保險代理", "保險通路",
-            "團體保險", "個人保險", "企業保險",
-            "保險科技", "數位保險", "線上投保",
-            "風險評估", "精算", "保險精算"
+            # 保險業務詞彙
+            "保險", "壽險", "理賠", "給付", "保單", "保費", "承保", "核保",
+            "要保人", "被保險人", "受益人", "保險金額", "保障額度"
         ]
         
-        # 排除的關鍵詞 - 避免無關新聞
+        # 排除關鍵詞
         self.exclude_keywords = [
-            "股價", "股票", "配息", "除權", "除息", "股東會",
-            "ETF", "基金", "債券", "匯率", "央行", "升息", "降息",
-            "銀行", "存款", "放款", "信用卡", "房貸", "車貸"
+            "股價", "股票", "配息", "除權", "除息", "股東會", "股東大會",
+            "ETF", "基金", "債券", "匯率", "央行政策", "升息", "降息"
         ]
     
     def _detect_encoding(self, content_bytes):
@@ -171,7 +120,7 @@ class FinanceNewsDirectCrawler(BaseCrawler):
         
         for site in self.sites:
             site_name = site["name"]
-            logger.info(f"爬取網站: {site_name}")
+            logger.info(f"🏢 正在爬取網站: {site_name}")
             
             try:
                 news_items = self._crawl_site(site)
@@ -179,40 +128,42 @@ class FinanceNewsDirectCrawler(BaseCrawler):
                 
                 time.sleep(random.uniform(1, 3))
                 
-                logger.info(f"從 {site_name} 爬取到 {len(news_items)} 條新聞")
+                logger.info(f"✅ 從 {site_name} 爬取到 {len(news_items)} 條新聞")
             except Exception as e:
-                logger.error(f"爬取 {site_name} 時出錯: {str(e)}")
+                logger.error(f"❌ 爬取 {site_name} 時出錯: {str(e)}")
         
-        # 改進的篩選邏輯
+        # 進階篩選邏輯
         filtered_news = []
+        logger.info(f"🔍 開始篩選 {len(all_news)} 條新聞...")
+        
         for item in all_news:
             title_content = (item.title + " " + (item.content or "")).lower()
             
-            # 檢查是否包含排除關鍵詞
+            # 檢查排除關鍵詞
             contains_exclude = any(exclude_word in title_content for exclude_word in self.exclude_keywords)
             if contains_exclude:
-                logger.debug(f"排除新聞（包含排除關鍵詞）: {item.title[:30]}...")
+                logger.debug(f"❌ 排除新聞（包含排除關鍵詞）: {item.title[:30]}...")
                 continue
             
             matched_keyword = None
             priority_score = 0
             
-            # 首先檢查主要保險關鍵詞（最高優先級）
-            for insurance_term in self.primary_insurance_keywords:
-                if insurance_term in item.title or (item.content and insurance_term in item.content):
-                    matched_keyword = insurance_term
-                    priority_score = 10  # 最高優先級
+            # 檢查主要關鍵詞（最高優先級）
+            for keyword in self.primary_keywords:
+                if keyword in item.title or (item.content and keyword in item.content):
+                    matched_keyword = keyword
+                    priority_score = 10
                     break
             
-            # 如果沒有匹配主要關鍵詞，檢查次要關鍵詞
+            # 檢查次要關鍵詞
             if not matched_keyword:
-                for secondary_term in self.secondary_keywords:
-                    if secondary_term in item.title or (item.content and secondary_term in item.content):
-                        matched_keyword = secondary_term
+                for keyword in self.secondary_keywords:
+                    if keyword in item.title or (item.content and keyword in item.content):
+                        matched_keyword = keyword
                         priority_score = 5
                         break
             
-            # 最後檢查原始搜尋關鍵詞
+            # 檢查原始搜尋關鍵詞
             if not matched_keyword:
                 for term in self.search_terms:
                     if term in item.title or (item.content and term in item.content):
@@ -222,11 +173,11 @@ class FinanceNewsDirectCrawler(BaseCrawler):
             
             if matched_keyword:
                 item.keyword = matched_keyword
-                item.priority_score = priority_score  # 添加優先級分數
+                item.priority_score = priority_score
                 filtered_news.append(item)
-                logger.info(f"符合關鍵詞 '{matched_keyword}' (優先級:{priority_score}) 的新聞: {item.title[:30]}...")
+                logger.info(f"✅ 符合關鍵詞 '{matched_keyword}' (優先級:{priority_score}): {item.title[:40]}...")
         
-        logger.info(f"過濾後剩餘 {len(filtered_news)} 條相關新聞")
+        logger.info(f"🎯 篩選完成，剩餘 {len(filtered_news)} 條相關新聞")
         
         # 按優先級和時間排序
         sorted_news = sorted(filtered_news, key=lambda x: (-getattr(x, 'priority_score', 0), -x.published_time.timestamp()))
@@ -243,7 +194,7 @@ class FinanceNewsDirectCrawler(BaseCrawler):
             if response.content:
                 detected_encoding = self._detect_encoding(response.content)
                 response.encoding = detected_encoding
-                logger.debug(f"檢測到編碼: {detected_encoding}")
+                logger.debug(f"🔤 檢測到編碼: {detected_encoding}")
             
             soup = BeautifulSoup(response.text, 'html.parser', from_encoding=response.encoding)
             
@@ -251,13 +202,15 @@ class FinanceNewsDirectCrawler(BaseCrawler):
             
             if not article_elements:
                 article_elements = soup.find_all("a", href=True)
-                logger.info(f"使用通用選擇器找到 {len(article_elements)} 個候選文章")
+                logger.debug(f"🔍 使用通用選擇器找到 {len(article_elements)} 個候選文章")
             else:
-                logger.info(f"找到 {len(article_elements)} 個候選文章")
+                logger.debug(f"🔍 找到 {len(article_elements)} 個候選文章")
             
             processed_count = 0
+            insurance_related_count = 0
+            
             for element in article_elements:
-                if processed_count >= 50:  # 增加處理數量
+                if processed_count >= 100:  # 增加處理數量
                     break
                     
                 try:
@@ -282,22 +235,27 @@ class FinanceNewsDirectCrawler(BaseCrawler):
                     if not title or len(title) < 5:
                         continue
                     
-                    # 改進的標題預篩選
+                    processed_count += 1
+                    
+                    # 預篩選：檢查標題是否包含保險相關詞彙
                     title_lower = title.lower()
                     
-                    # 檢查是否包含保險相關詞彙
-                    contains_insurance_keyword = any(keyword in title_lower for keyword in [
+                    # 檢查是否包含保險關鍵詞
+                    contains_insurance = any(keyword in title_lower for keyword in [
                         "保險", "壽險", "新光", "台新", "理賠", "保單", "保費", 
                         "健康險", "意外險", "醫療險", "投保", "承保", "給付",
                         "投資型", "利變", "年金", "儲蓄險", "重大疾病", "癌症險"
                     ])
                     
-                    # 如果標題包含排除關鍵詞，跳過
+                    # 檢查是否包含排除關鍵詞
                     contains_exclude = any(exclude_word in title_lower for exclude_word in self.exclude_keywords)
                     
                     # 只處理保險相關且不包含排除關鍵詞的新聞
-                    if not contains_insurance_keyword or contains_exclude:
+                    if not contains_insurance or contains_exclude:
                         continue
+                    
+                    insurance_related_count += 1
+                    logger.debug(f"🎯 發現保險相關新聞: {title[:50]}...")
                     
                     # 獲取連結
                     url = element.get("href")
@@ -307,8 +265,8 @@ class FinanceNewsDirectCrawler(BaseCrawler):
                     if not url.startswith(("http://", "https://")):
                         url = urljoin(site["base_url"], url)
                     
-                    # 獲取發布時間
-                    pub_time = datetime.now()  # 簡化時間處理，默認為當前時間
+                    # 獲取發布時間（簡化處理）
+                    pub_time = datetime.now()
                     
                     # 檢查時間限制
                     hours_diff = (datetime.now() - pub_time).total_seconds() / 3600
@@ -329,14 +287,15 @@ class FinanceNewsDirectCrawler(BaseCrawler):
                     )
                     
                     news_items.append(news_item)
-                    processed_count += 1
-                    logger.debug(f"成功解析新聞: {title[:30]}...")
+                    logger.debug(f"✅ 成功解析新聞: {title[:30]}...")
                     
                 except Exception as e:
-                    logger.warning(f"解析文章時出錯: {str(e)}")
+                    logger.warning(f"⚠️ 解析文章時出錯: {str(e)}")
+            
+            logger.info(f"📊 {site['name']}: 處理了{processed_count}篇文章，找到{insurance_related_count}篇保險相關，成功解析{len(news_items)}篇")
             
         except Exception as e:
-            logger.error(f"爬取網站 {site['name']} 時出錯: {str(e)}")
+            logger.error(f"❌ 爬取網站 {site['name']} 時出錯: {str(e)}")
         
         return news_items
     
@@ -353,6 +312,10 @@ class FinanceNewsDirectCrawler(BaseCrawler):
                 response.encoding = detected_encoding
             
             soup = BeautifulSoup(response.text, 'html.parser', from_encoding=response.encoding)
+            
+            # 移除廣告和無關元素
+            for element in soup.select("script, style, iframe, ins, .ad, .ads, .advertisement"):
+                element.extract()
             
             content_selectors = [
                 "div.article-content", 
@@ -372,15 +335,13 @@ class FinanceNewsDirectCrawler(BaseCrawler):
             for selector in content_selectors:
                 content_element = soup.select_one(selector)
                 if content_element:
-                    for element in content_element.select("script, style, iframe, ins, .ad, .ads"):
-                        element.extract()
-                    
                     content_text = content_element.get_text(separator="\n").strip()
-                    if content_text:
+                    if len(content_text) > 100:
                         break
             
             if not content_text:
-                for element in soup.select("header, footer, nav, aside, .sidebar, .ads, .ad, script, style"):
+                # 移除頭部、底部等無關元素
+                for element in soup.select("header, footer, nav, aside, .sidebar, .ads, .ad"):
                     element.extract()
                 
                 content_text = soup.get_text(separator="\n").strip()
@@ -394,5 +355,5 @@ class FinanceNewsDirectCrawler(BaseCrawler):
             return content_text
         
         except Exception as e:
-            logger.warning(f"獲取文章內容時出錯: {str(e)}")
+            logger.warning(f"⚠️ 獲取文章內容時出錯: {str(e)}")
             return "無法獲取文章內容"
